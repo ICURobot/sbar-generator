@@ -24,7 +24,7 @@
 <body class="p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
-        <!-- 2. Add Login/Logout section -->
+        <!-- Login/Logout section -->
         <div id="auth-container" class="bg-white rounded-lg shadow-md p-4 mb-6 flex justify-between items-center">
             <div id="user-info" class="text-sm font-medium text-gray-600">Please log in to use the generator.</div>
             <button data-netlify-identity-button class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
@@ -32,7 +32,7 @@
 
         <!-- The main container for the assessment sheet -->
         <div class="relative">
-            <!-- 3. Add an overlay to disable the form when logged out -->
+            <!-- Overlay to disable the form when logged out -->
             <div id="form-overlay" class="absolute inset-0 bg-gray-200 bg-opacity-50 z-20 flex items-center justify-center rounded-lg">
                 <p class="text-lg font-bold text-gray-700">Please log in to activate the form.</p>
             </div>
@@ -149,7 +149,7 @@
 
                 <!-- AI Feature Button -->
                 <div class="text-center mt-8">
-                    <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto">
+                    <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto" disabled>
                         ✨ Generate SBAR Handoff Report
                     </button>
                 </div>
@@ -190,14 +190,18 @@
     // --- All existing JavaScript is the same, with the addition of the auth handling ---
     const generateBtn = document.getElementById('generate-sbar-btn');
     const modal = document.getElementById('sbar-modal');
-    // ... (rest of the variable declarations)
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const reportContent = document.getElementById('report-content');
+    const sbarReportText = document.getElementById('sbar-report-text');
+    const copyReportBtn = document.getElementById('copy-report-btn');
     const copySuccessMsg = document.getElementById('copy-success-msg');
     const form = document.getElementById('assessment-form');
     const formOverlay = document.getElementById('form-overlay');
     const userInfo = document.getElementById('user-info');
     const authBtn = document.querySelector('[data-netlify-identity-button]');
 
-    // 4. JavaScript to handle login state
+    // JavaScript to handle login state
     function updateLoginState(user) {
         if (user) {
             // User is logged in
@@ -221,15 +225,27 @@
         netlifyIdentity.close(); // Close the modal on login
     });
     netlifyIdentity.on('logout', () => updateLoginState(null));
+    
+    // **THIS IS THE FIX!**
+    // Explicitly initialize the widget to make sure it runs.
+    if (window.netlifyIdentity) {
+      netlifyIdentity.init();
+    }
 
 
     generateBtn.addEventListener('click', handleGenerateSbar);
-    // ... (rest of event listeners are the same)
-    
-    // --- All other functions (collectFormData, handleGenerateSbar, etc.) are the same EXCEPT for handleGenerateSbar ---
+    closeModalBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => e.target === modal && closeModal());
+    copyReportBtn.addEventListener('click', copyReportToClipboard);
     
     function collectFormData() {
-        // ... (this function is identical)
+        const data = {};
+        Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
+            if (el.id && el.value.trim()) {
+                data[el.id] = el.value.trim();
+            }
+        });
+        return data;
     }
 
     async function handleGenerateSbar() {
@@ -250,12 +266,11 @@
         reportContent.classList.add('hidden');
         
         try {
-            // The user's token is automatically sent with the request by the browser
             const response = await fetch('/.netlify/functions/generate-sbar', {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${user.token.access_token}` // Pass the user's token
+                    'Authorization': `Bearer ${user.token.access_token}`
                 },
                 body: JSON.stringify({ patientData: formData })
             });
@@ -280,7 +295,26 @@
         }
     }
 
-    // ... (rest of JavaScript functions are identical)
+    function copyReportToClipboard() {
+        sbarReportText.select();
+        document.execCommand('copy');
+        copySuccessMsg.classList.remove('hidden');
+        setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
+    }
+
+    function openModal() {
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.querySelector('.modal-content').style.transform = 'scale(1)';
+        }, 10);
+    }
+
+    function closeModal() {
+        modal.style.opacity = '0';
+        modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
+        setTimeout(() => modal.classList.add('hidden'), 250);
+    }
 
 </script>
 </body>
