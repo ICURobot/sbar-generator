@@ -1,10 +1,7 @@
-
 // This file lives in the `netlify/functions` directory
 // It is a Node.js function that will run on Netlify's servers.
+// This version includes AI-powered clinical suggestions.
 
-// We need 'fetch' in a Node.js environment. `node-fetch` is a common choice.
-// You'll need to add it to your project's dependencies.
-// Run `npm install node-fetch` in your project folder.
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 exports.handler = async function(event, context) {
@@ -17,7 +14,6 @@ exports.handler = async function(event, context) {
         const { patientData } = JSON.parse(event.body);
 
         // Your secret API key is retrieved from Netlify's environment variables.
-        // It is NEVER exposed to the frontend.
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
@@ -26,16 +22,21 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
+        // UPDATED PROMPT: Now asks for clinical suggestions in a new section.
         const prompt = `
-            You are an expert Canadian ICU nurse preparing a verbal handoff report for another nurse.
-            Based on the following patient data, generate a clear, concise, and professional SBAR (Situation, Background, Assessment, Recommendation) report.
-            Synthesize the data into a coherent narrative. Do not just list the data. Focus on the most critical information.
-            Use Canadian medical terminology and units (e.g., mmol/L).
+            You are an expert Canadian ICU nurse acting as a clinical co-pilot.
+            Your task is to perform two actions based on the provided patient data:
+            1. Generate a clear, concise, and professional SBAR (Situation, Background, Assessment, Recommendation) report suitable for handoff.
+            2. After the SBAR, create a new section titled "Clinical Considerations & Suggestions". In this section, analyze the patient data for potential issues, concerning trends, or things that might need attention. Provide a few bullet-point suggestions for the nurse to consider (e.g., "Urine output seems low, consider fluid challenge if BP allows," or "Monitor potassium closely given the recent lab value.").
+
+            IMPORTANT: Always conclude with the disclaimer: "Disclaimer: These are AI-generated suggestions and do not replace professional clinical judgment."
+
+            Use Canadian medical terminology and units.
 
             Patient Data:
             ${JSON.stringify(patientData, null, 2)}
 
-            Generate the SBAR report:
+            Generate the report now:
         `;
 
         const payload = {
