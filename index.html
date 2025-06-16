@@ -1,0 +1,210 @@
+<!-- ======================================================================= -->
+<!-- FILE 1: index.html (This is your main frontend file)                   -->
+<!-- ======================================================================= -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICU Head-to-Toe Assessment Sheet with ✨ AI SBAR Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .modal { transition: opacity 0.25s ease; }
+        .modal-content { transition: transform 0.25s ease; }
+        .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- The main container for the assessment sheet -->
+    <div id="assessment-form" class="max-w-4xl mx-auto bg-white rounded-lg shadow-2xl p-6 md:p-8">
+        <!-- Header Section -->
+        <header class="border-b-2 border-gray-200 pb-4 mb-6 text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ICU SBAR Report Generator</h1>
+            <p class="text-sm font-semibold text-sky-700 mt-1">Fill out the patient details below and click generate!</p>
+        </header>
+
+        <!-- Patient Information Section (and all other form fields) -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-6">
+            <div class="flex items-end"><span class="font-bold mr-2">Room:</span><input id="room" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="flex items-end"><span class="font-bold mr-2">Name:</span><input id="name" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="flex items-end"><span class="font-bold mr-2">Age/Sex:</span><input id="age-sex" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="flex items-end"><span class="font-bold mr-2">MD:</span><input id="md" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="col-span-2 flex items-end"><span class="font-bold mr-2">Allergies:</span><input id="allergies" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="flex items-end"><span class="font-bold mr-2">Code Status:</span><input id="code-status" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="flex items-end"><span class="font-bold mr-2">Isolation:</span><input id="isolation" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
+            <div class="col-span-2 flex items-start"><span class="font-bold mr-2 mt-1">Diagnosis:</span><textarea id="diagnosis" class="w-full h-8 border-0 border-b border-gray-300 focus:ring-0 focus:border-sky-500 resize-none p-0"></textarea></div>
+            <div class="col-span-2 flex items-start"><span class="font-bold mr-2 mt-1">History:</span><textarea id="history" class="w-full h-8 border-0 border-b border-gray-300 focus:ring-0 focus:border-sky-500 resize-none p-0"></textarea></div>
+        </section>
+
+        <!-- Main Systems Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Neurological -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Neurological</h2>
+                <div class="space-y-3 text-sm">
+                     <div><span class="font-semibold">LOC/GCS:</span> <input id="loc" class="w-full border-0 border-b p-0" placeholder="A&O x ?, GCS: E4V5M6"></div>
+                     <div><span class="font-semibold">Pupils:</span> <input id="pupils" class="w-full border-0 border-b p-0" placeholder="PERRLA, 3mm, etc."></div>
+                     <div><span class="font-semibold">Sedation/Pain:</span> <input id="sedation-pain" class="w-full border-0 border-b p-0" placeholder="RASS, CPOT"></div>
+                </div>
+            </div>
+            <!-- Cardiovascular -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Cardiovascular</h2>
+                 <div class="space-y-3 text-sm">
+                    <div><span class="font-semibold">HR/Rhythm:</span> <input id="hr-rhythm" class="w-full border-0 border-b p-0"></div>
+                    <div><span class="font-semibold">BP/MAP:</span> <input id="bp-map" class="w-full border-0 border-b p-0"></div>
+                    <div><span class="font-semibold">Heart Sounds:</span> <input id="heart-sounds" class="w-full border-0 border-b p-0"></div>
+                </div>
+            </div>
+            <!-- Respiratory -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Respiratory</h2>
+                <div class="space-y-3 text-sm">
+                    <div><span class="font-semibold">O2/Vent:</span> <input id="o2-delivery" class="w-full border-0 border-b p-0"></div>
+                    <div><span class="font-semibold">Breath Sounds:</span><textarea id="breath-sounds" class="w-full border-0 border-b resize-none p-0"></textarea></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Key Information Textareas -->
+        <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">IV Drips / Infusions</h2>
+                <textarea id="drips" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Norepinephrine @ 10 mcg/min..."></textarea>
+            </div>
+            <div>
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Key Labs / Diagnostics</h2>
+                <textarea id="labs-diagnostics" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., K: 3.2, WBC: 15.1, Lactate: 4.2..."></textarea>
+            </div>
+        </section>
+        
+        <section class="mt-6">
+            <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Plan for the Shift</h2>
+            <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
+        </section>
+    </div>
+
+    <!-- AI Feature Button -->
+    <div class="text-center mt-8">
+        <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto">
+            ✨ Generate SBAR Handoff Report
+        </button>
+    </div>
+
+    <!-- SBAR Generation Modal -->
+    <div id="sbar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95">
+             <div class="p-6">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">Generated SBAR Report</h2>
+                    <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+                </div>
+                <div id="modal-body" class="relative">
+                    <div id="loading-indicator" class="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center rounded-lg hidden">
+                        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div>
+                        <p class="text-lg font-semibold text-gray-600">Generating report, please wait...</p>
+                    </div>
+                    <div id="report-content" class="space-y-4">
+                        <p class="text-sm text-gray-600">Review the generated report below. You can edit it here before copying.</p>
+                        <textarea id="sbar-report-text" class="w-full h-96 p-3 border rounded-md bg-gray-50 text-sm font-mono"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-end items-center gap-4 rounded-b-lg">
+                <span id="copy-success-msg" class="text-green-600 font-semibold hidden">Copied!</span>
+                <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg transition-colors">
+                    Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const generateBtn = document.getElementById('generate-sbar-btn');
+    const modal = document.getElementById('sbar-modal');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const reportContent = document.getElementById('report-content');
+    const sbarReportText = document.getElementById('sbar-report-text');
+    const copyReportBtn = document.getElementById('copy-report-btn');
+    const copySuccessMsg = document.getElementById('copy-success-msg');
+    const form = document.getElementById('assessment-form');
+
+    generateBtn.addEventListener('click', handleGenerateSbar);
+    closeModalBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => e.target === modal && closeModal());
+    copyReportBtn.addEventListener('click', copyReportToClipboard);
+
+    function collectFormData() {
+        const data = {};
+        Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
+            if (el.id && el.value.trim()) {
+                data[el.id] = el.value.trim();
+            }
+        });
+        return data;
+    }
+
+    async function handleGenerateSbar() {
+        const formData = collectFormData();
+        if (Object.keys(formData).length === 0) {
+            alert("Please fill out some patient information first.");
+            return;
+        }
+
+        openModal();
+        loadingIndicator.classList.remove('hidden');
+        reportContent.classList.add('hidden');
+        
+        try {
+            // This is the CRUCIAL change. We now call our own backend function.
+            const response = await fetch('/.netlify/functions/generate-sbar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ patientData: formData })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `Request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+            sbarReportText.value = result.report;
+
+        } catch (error) {
+            console.error("Error calling backend function:", error);
+            sbarReportText.value = `An error occurred: ${error.message}`;
+        } finally {
+            loadingIndicator.classList.add('hidden');
+            reportContent.classList.remove('hidden');
+        }
+    }
+
+    function copyReportToClipboard() {
+        sbarReportText.select();
+        document.execCommand('copy');
+        copySuccessMsg.classList.remove('hidden');
+        setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
+    }
+
+    function openModal() {
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.style.opacity = '1';
+            modal.querySelector('.modal-content').style.transform = 'scale(1)';
+        }, 10);
+    }
+
+    function closeModal() {
+        modal.style.opacity = '0';
+        modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
+        setTimeout(() => modal.classList.add('hidden'), 250);
+    }
+</script>
+</body>
+</html>

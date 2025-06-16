@@ -1,0 +1,8 @@
+# This file tells Netlify where your functions live.
+[functions]
+  directory = "netlify/functions/"
+
+# This tells Netlify to install the dependencies for your functions.
+[build]
+  command = "npm install"
+  functions = "netlify/functions/"
