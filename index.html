@@ -43,8 +43,7 @@
                     <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ICU SBAR Report Generator</h1>
                 </header>
 
-                <!-- All form fields go here, no changes needed to the form itself -->
-                <!-- Patient Information Section -->
+                <!-- All form fields go here -->
                 <section class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-6">
                     <div class="flex items-end"><span class="font-bold mr-2">Room:</span><input id="room" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
                     <div class="flex items-end"><span class="font-bold mr-2">Name:</span><input id="name" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
@@ -57,9 +56,7 @@
                     <div class="col-span-2 flex items-start"><span class="font-bold mr-2 mt-1">History:</span><textarea id="history" class="w-full h-8 border-0 border-b border-gray-300 focus:ring-0 focus:border-sky-500 resize-none p-0"></textarea></div>
                 </section>
 
-                <!-- Main Systems Grid -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Neurological -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Neurological</h2>
                         <div class="space-y-3 text-sm">
@@ -70,7 +67,6 @@
                              <div><span class="font-semibold">EVD/ICP:</span> <input id="evd" class="w-full border-0 border-b p-0" placeholder="Clamped, ICP, drainage"></div>
                         </div>
                     </div>
-                    <!-- Cardiovascular -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Cardiovascular</h2>
                          <div class="space-y-3 text-sm">
@@ -81,7 +77,6 @@
                             <div><span class="font-semibold">IABP/Support:</span> <input id="iabp" class="w-full border-0 border-b p-0" placeholder="IABP 1:1, Impella, ECMO"></div>
                         </div>
                     </div>
-                    <!-- Respiratory -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Respiratory</h2>
                         <div class="space-y-3 text-sm">
@@ -91,7 +86,6 @@
                             <div><span class="font-semibold">Breath Sounds:</span><textarea id="breath-sounds" class="w-full border-0 border-b resize-none p-0" placeholder="Coarse in RLL, CTA elsewhere"></textarea></div>
                         </div>
                     </div>
-                    <!-- GI/GU Section -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">GI / GU</h2>
                         <div class="space-y-3 text-sm">
@@ -100,7 +94,6 @@
                             <div><span class="font-semibold">Urine Output:</span> <input id="urine-output" class="w-full border-0 border-b p-0" placeholder="Foley, >30mL/hr, clear"></div>
                         </div>
                     </div>
-                    <!-- Access Section -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Access</h2>
                          <div class="space-y-3 text-sm">
@@ -109,7 +102,6 @@
                             <div><span class="font-semibold">Other Drains/Tubes:</span> <input id="drains-tubes" class="w-full border-0 border-b p-0" placeholder="Chest tube, NG tube"></div>
                         </div>
                     </div>
-                     <!-- Integumentary/MSK Section -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Integumentary / MSK</h2>
                          <div class="space-y-3 text-sm">
@@ -119,7 +111,6 @@
                     </div>
                 </div>
                 
-                <!-- Key Information Textareas -->
                  <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Key Labs / Diagnostics</h2>
@@ -147,7 +138,6 @@
                      <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
                 </section>
 
-                <!-- AI Feature Button -->
                 <div class="text-center mt-8">
                     <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto" disabled>
                         ✨ Generate SBAR Handoff Report
@@ -187,135 +177,127 @@
     </div>
 
 <script>
-    // --- All existing JavaScript is the same, with the addition of the auth handling ---
-    const generateBtn = document.getElementById('generate-sbar-btn');
-    const modal = document.getElementById('sbar-modal');
-    const closeModalBtn = document.getElementById('close-modal-btn');
-    const loadingIndicator = document.getElementById('loading-indicator');
-    const reportContent = document.getElementById('report-content');
-    const sbarReportText = document.getElementById('sbar-report-text');
-    const copyReportBtn = document.getElementById('copy-report-btn');
-    const copySuccessMsg = document.getElementById('copy-success-msg');
-    const form = document.getElementById('assessment-form');
-    const formOverlay = document.getElementById('form-overlay');
-    const userInfo = document.getElementById('user-info');
-    const authBtn = document.querySelector('[data-netlify-identity-button]');
+    // **THIS IS THE NEW, MORE ROBUST SCRIPT**
+    document.addEventListener('DOMContentLoaded', () => {
+        const generateBtn = document.getElementById('generate-sbar-btn');
+        const modal = document.getElementById('sbar-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const reportContent = document.getElementById('report-content');
+        const sbarReportText = document.getElementById('sbar-report-text');
+        const copyReportBtn = document.getElementById('copy-report-btn');
+        const copySuccessMsg = document.getElementById('copy-success-msg');
+        const form = document.getElementById('assessment-form');
+        const formOverlay = document.getElementById('form-overlay');
+        const userInfo = document.getElementById('user-info');
+        const authBtn = document.querySelector('[data-netlify-identity-button]');
 
-    // JavaScript to handle login state
-    function updateLoginState(user) {
-        if (user) {
-            // User is logged in
-            userInfo.textContent = `Welcome, ${user.email}!`;
-            authBtn.textContent = 'Log Out';
-            formOverlay.classList.add('hidden'); // Hide the overlay
-            generateBtn.disabled = false; // Enable the button
-        } else {
-            // User is logged out
-            userInfo.textContent = 'Please log in to use the generator.';
-            authBtn.textContent = 'Log In / Sign Up';
-            formOverlay.classList.remove('hidden'); // Show the overlay
-            generateBtn.disabled = true; // Disable the button
-        }
-    }
-    
-    // Listen for Netlify Identity events
-    netlifyIdentity.on('init', user => updateLoginState(user));
-    netlifyIdentity.on('login', user => {
-        updateLoginState(user);
-        netlifyIdentity.close(); // Close the modal on login
-    });
-    netlifyIdentity.on('logout', () => updateLoginState(null));
-    
-    // **THIS IS THE FIX!**
-    // Explicitly initialize the widget to make sure it runs.
-    if (window.netlifyIdentity) {
-      netlifyIdentity.init();
-    }
-
-
-    generateBtn.addEventListener('click', handleGenerateSbar);
-    closeModalBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', (e) => e.target === modal && closeModal());
-    copyReportBtn.addEventListener('click', copyReportToClipboard);
-    
-    function collectFormData() {
-        const data = {};
-        Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
-            if (el.id && el.value.trim()) {
-                data[el.id] = el.value.trim();
+        function updateLoginState(user) {
+            if (user) {
+                userInfo.textContent = `Welcome, ${user.email}!`;
+                authBtn.textContent = 'Log Out';
+                formOverlay.classList.add('hidden');
+                generateBtn.disabled = false;
+            } else {
+                userInfo.textContent = 'Please log in to use the generator.';
+                authBtn.textContent = 'Log In / Sign Up';
+                formOverlay.classList.remove('hidden');
+                generateBtn.disabled = true;
             }
-        });
-        return data;
-    }
-
-    async function handleGenerateSbar() {
-        const user = netlifyIdentity.currentUser();
-        if (!user) {
-            alert("You must be logged in to generate a report.");
-            return;
         }
 
-        const formData = collectFormData();
-        if (Object.keys(formData).length === 0) {
-            alert("Please fill out some patient information first.");
-            return;
-        }
-
-        openModal();
-        loadingIndicator.classList.remove('hidden');
-        reportContent.classList.add('hidden');
-        
-        try {
-            const response = await fetch('/.netlify/functions/generate-sbar', {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${user.token.access_token}`
-                },
-                body: JSON.stringify({ patientData: formData })
+        if (window.netlifyIdentity) {
+            netlifyIdentity.on('init', user => updateLoginState(user));
+            netlifyIdentity.on('login', user => {
+                updateLoginState(user);
+                netlifyIdentity.close();
             });
+            netlifyIdentity.on('logout', () => updateLoginState(null));
+        }
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                if (response.status === 401) {
-                     throw new Error("Authentication error. Please log in again.");
+        generateBtn.addEventListener('click', handleGenerateSbar);
+        closeModalBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => e.target === modal && closeModal());
+        copyReportBtn.addEventListener('click', copyReportToClipboard);
+
+        function collectFormData() {
+            const data = {};
+            Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
+                if (el.id && el.value.trim()) {
+                    data[el.id] = el.value.trim();
                 }
-                throw new Error(errorData.error || `Request failed with status ${response.status}`);
+            });
+            return data;
+        }
+
+        async function handleGenerateSbar() {
+            const user = window.netlifyIdentity.currentUser();
+            if (!user) {
+                alert("You must be logged in to generate a report.");
+                return;
             }
 
-            const result = await response.json();
-            sbarReportText.value = result.report;
+            const formData = collectFormData();
+            if (Object.keys(formData).length === 0) {
+                alert("Please fill out some patient information first.");
+                return;
+            }
 
-        } catch (error) {
-            console.error("Error calling backend function:", error);
-            sbarReportText.value = `An error occurred: ${error.message}`;
-        } finally {
-            loadingIndicator.classList.add('hidden');
-            reportContent.classList.remove('hidden');
+            openModal();
+            loadingIndicator.classList.remove('hidden');
+            reportContent.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/.netlify/functions/generate-sbar', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${user.token.access_token}`
+                    },
+                    body: JSON.stringify({ patientData: formData })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    if (response.status === 401) {
+                         throw new Error("Authentication error. Please log in again.");
+                    }
+                    throw new Error(errorData.error || `Request failed with status ${response.status}`);
+                }
+
+                const result = await response.json();
+                sbarReportText.value = result.report;
+
+            } catch (error) {
+                console.error("Error calling backend function:", error);
+                sbarReportText.value = `An error occurred: ${error.message}`;
+            } finally {
+                loadingIndicator.classList.add('hidden');
+                reportContent.classList.remove('hidden');
+            }
         }
-    }
 
-    function copyReportToClipboard() {
-        sbarReportText.select();
-        document.execCommand('copy');
-        copySuccessMsg.classList.remove('hidden');
-        setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
-    }
+        function copyReportToClipboard() {
+            sbarReportText.select();
+            document.execCommand('copy');
+            copySuccessMsg.classList.remove('hidden');
+            setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
+        }
 
-    function openModal() {
-        modal.classList.remove('hidden');
-        setTimeout(() => {
-            modal.style.opacity = '1';
-            modal.querySelector('.modal-content').style.transform = 'scale(1)';
-        }, 10);
-    }
+        function openModal() {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.style.opacity = '1';
+                modal.querySelector('.modal-content').style.transform = 'scale(1)';
+            }, 10);
+        }
 
-    function closeModal() {
-        modal.style.opacity = '0';
-        modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
-        setTimeout(() => modal.classList.add('hidden'), 250);
-    }
-
+        function closeModal() {
+            modal.style.opacity = '0';
+            modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
+            setTimeout(() => modal.classList.add('hidden'), 250);
+        }
+    });
 </script>
 </body>
 </html>
