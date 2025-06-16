@@ -27,7 +27,8 @@
         <!-- Login/Logout section -->
         <div id="auth-container" class="bg-white rounded-lg shadow-md p-4 mb-6 flex justify-between items-center">
             <div id="user-info" class="text-sm font-medium text-gray-600">Please log in to use the generator.</div>
-            <button data-netlify-identity-button class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
+            <!-- UPDATED: Removed data-netlify-identity-button and added an ID -->
+            <button id="auth-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
         </div>
 
         <!-- The main container for the assessment sheet -->
@@ -177,7 +178,6 @@
     </div>
 
 <script>
-    // **THIS IS THE NEW, MORE ROBUST SCRIPT**
     document.addEventListener('DOMContentLoaded', () => {
         const generateBtn = document.getElementById('generate-sbar-btn');
         const modal = document.getElementById('sbar-modal');
@@ -190,7 +190,7 @@
         const form = document.getElementById('assessment-form');
         const formOverlay = document.getElementById('form-overlay');
         const userInfo = document.getElementById('user-info');
-        const authBtn = document.querySelector('[data-netlify-identity-button]');
+        const authBtn = document.getElementById('auth-btn'); // Use the new ID
 
         function updateLoginState(user) {
             if (user) {
@@ -206,6 +206,16 @@
             }
         }
 
+        // UPDATED: Added click listener for explicit login/logout
+        authBtn.addEventListener('click', () => {
+            const user = window.netlifyIdentity.currentUser();
+            if (user) {
+                window.netlifyIdentity.logout();
+            } else {
+                window.netlifyIdentity.open();
+            }
+        });
+        
         if (window.netlifyIdentity) {
             netlifyIdentity.on('init', user => updateLoginState(user));
             netlifyIdentity.on('login', user => {
