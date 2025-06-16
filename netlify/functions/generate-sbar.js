@@ -1,19 +1,15 @@
 // This file lives in the `netlify/functions` directory.
-// This is the SECURE, GATED version with USAGE TRACKING.
-// It checks for a valid user and tracks their usage in Firestore.
+// This version returns a structured JSON object for beautiful formatting on the frontend.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
-// 1. Add the Firebase Admin SDK
 const admin = require('firebase-admin');
 
-// 2. Initialize Firebase Admin, but only if it hasn't been already.
-// This is important for serverless environments.
+// Initialize Firebase Admin
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      // The private key needs special handling to parse correctly from an environment variable.
       privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
     }),
   });
@@ -22,69 +18,49 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 exports.handler = async function(event, context) {
+    // Check for authenticated user
     if (!context.clientContext || !context.clientContext.user) {
-        return {
-            statusCode: 401,
-            body: JSON.stringify({ error: 'You must be logged in to generate a report.' })
-        };
+        return { statusCode: 401, body: JSON.stringify({ error: 'You must be logged in.' }) };
     }
-
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
-        // --- This is the new usage tracking logic ---
+        // --- Usage tracking logic (no changes here) ---
         const user = context.clientContext.user;
-        const userRef = db.collection('users').doc(user.sub); // 'sub' is the unique user ID from Netlify Identity
-        
+        const userRef = db.collection('users').doc(user.sub);
         const doc = await userRef.get();
         if (!doc.exists) {
-            // If the user is new, create their record
-            await userRef.set({
-                email: user.email,
-                usage_count: 1,
-                last_used: new Date().toISOString(),
-            });
+            await userRef.set({ email: user.email, usage_count: 1, last_used: new Date().toISOString() });
         } else {
-            // If they exist, increment their usage count
-            await userRef.update({
-                usage_count: admin.firestore.FieldValue.increment(1),
-                last_used: new Date().toISOString(),
-            });
+            await userRef.update({ usage_count: admin.firestore.FieldValue.increment(1), last_used: new Date().toISOString() });
         }
-        // --- End of new usage tracking logic ---
-
+        // --- End of usage tracking logic ---
 
         const { patientData } = JSON.parse(event.body);
         const apiKey = process.env.GEMINI_API_KEY;
 
-        if (!apiKey) {
-            throw new Error("API key is not configured.");
-        }
+        if (!apiKey) throw new Error("API key is not configured.");
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
+        // UPDATED PROMPT: Asks for a JSON object.
         const prompt = `
-            You are an expert Canadian ICU nurse acting as a clinical co-pilot.
-            Your task is to perform two actions based on the provided patient data:
-            1. Generate a clear, concise, and professional SBAR (Situation, Background, Assessment, Recommendation) report suitable for handoff.
-            2. After the SBAR, create a new section titled "Clinical Considerations & Suggestions". In this section, analyze the patient data for potential issues, concerning trends, or things that might need attention. Provide a few bullet-point suggestions for the nurse to consider (e.g., "Urine output seems low, consider fluid challenge if BP allows," or "Monitor potassium closely given the recent lab value.").
-
-            IMPORTANT: Always conclude with the disclaimer: "Disclaimer: These are AI-generated suggestions and do not replace professional clinical judgment."
-
-            Use Canadian medical terminology and units.
+            You are an expert Canadian ICU nurse. Based on the provided patient data, generate a report as a JSON object.
+            The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
+            - The SBAR sections should be concise and professional for handoff.
+            - The "suggestions" key should contain a few bullet points for clinical considerations, followed by the disclaimer.
+            - Use Canadian medical terminology. Do not include any extra text or markdown formatting outside of the JSON structure.
 
             Patient Data:
             ${JSON.stringify(patientData, null, 2)}
 
-            Generate the report now:
+            Generate the JSON object now:
         `;
 
         const payload = {
-            contents: [{
-                parts: [{ text: prompt }]
-            }]
+            contents: [{ parts: [{ text: prompt }] }]
         };
 
         const apiResponse = await fetch(apiUrl, {
@@ -95,24 +71,26 @@ exports.handler = async function(event, context) {
 
         if (!apiResponse.ok) {
             const errorBody = await apiResponse.json();
-            console.error("Gemini API Error:", errorBody);
             throw new Error(errorBody.error?.message || "Failed to get a response from the AI.");
         }
 
         const result = await apiResponse.json();
-        const reportText = result.candidates[0].content.parts[0].text;
+        
+        // Extract the text and clean it up to ensure it's valid JSON
+        let reportText = result.candidates[0].content.parts[0].text;
+        reportText = reportText.replace(/```json\n/g, '').replace(/\n```/g, '').trim();
+        
+        // Parse the text to a JSON object to send to the frontend
+        const reportJson = JSON.parse(reportText);
         
         return {
             statusCode: 200,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ report: reportText })
+            body: JSON.stringify({ report: reportJson }) // Send the JSON object
         };
 
     } catch (error) {
         console.error("Function Error:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: error.message })
-        };
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
