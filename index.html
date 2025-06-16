@@ -1,12 +1,9 @@
-<!-- ======================================================================= -->
-<!-- FILE 1: index.html (This is your main frontend file)                   -->
-<!-- ======================================================================= -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICU Head-to-Toe Assessment Sheet with ✨ AI SBAR Generator</title>
+    <title>Enhanced ICU SBAR Report Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -27,7 +24,7 @@
             <p class="text-sm font-semibold text-sky-700 mt-1">Fill out the patient details below and click generate!</p>
         </header>
 
-        <!-- Patient Information Section (and all other form fields) -->
+        <!-- Patient Information Section -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-6">
             <div class="flex items-end"><span class="font-bold mr-2">Room:</span><input id="room" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
             <div class="flex items-end"><span class="font-bold mr-2">Name:</span><input id="name" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
@@ -49,23 +46,55 @@
                      <div><span class="font-semibold">LOC/GCS:</span> <input id="loc" class="w-full border-0 border-b p-0" placeholder="A&O x ?, GCS: E4V5M6"></div>
                      <div><span class="font-semibold">Pupils:</span> <input id="pupils" class="w-full border-0 border-b p-0" placeholder="PERRLA, 3mm, etc."></div>
                      <div><span class="font-semibold">Sedation/Pain:</span> <input id="sedation-pain" class="w-full border-0 border-b p-0" placeholder="RASS, CPOT"></div>
+                     <div><span class="font-semibold">Delirium Score:</span> <input id="delirium-score" class="w-full border-0 border-b p-0" placeholder="CAM-ICU +, ICDSC score"></div>
+                     <div><span class="font-semibold">EVD/ICP:</span> <input id="evd" class="w-full border-0 border-b p-0" placeholder="Clamped, ICP, drainage"></div>
                 </div>
             </div>
             <!-- Cardiovascular -->
             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Cardiovascular</h2>
                  <div class="space-y-3 text-sm">
-                    <div><span class="font-semibold">HR/Rhythm:</span> <input id="hr-rhythm" class="w-full border-0 border-b p-0"></div>
-                    <div><span class="font-semibold">BP/MAP:</span> <input id="bp-map" class="w-full border-0 border-b p-0"></div>
-                    <div><span class="font-semibold">Heart Sounds:</span> <input id="heart-sounds" class="w-full border-0 border-b p-0"></div>
+                    <div><span class="font-semibold">HR/Rhythm:</span> <input id="hr-rhythm" class="w-full border-0 border-b p-0" placeholder="80s, NSR"></div>
+                    <div><span class="font-semibold">BP/MAP:</span> <input id="bp-map" class="w-full border-0 border-b p-0" placeholder="120/80 (93)"></div>
+                    <div><span class="font-semibold">Pulses:</span> <input id="pulses" class="w-full border-0 border-b p-0" placeholder="Present, +1, doppler"></div>
+                    <div><span class="font-semibold">Pacemaker:</span> <input id="pacemaker" class="w-full border-0 border-b p-0" placeholder="Paced Atrial, VVI @ 70"></div>
+                    <div><span class="font-semibold">IABP/Support:</span> <input id="iabp" class="w-full border-0 border-b p-0" placeholder="IABP 1:1, Impella, ECMO"></div>
                 </div>
             </div>
             <!-- Respiratory -->
             <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                 <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Respiratory</h2>
                 <div class="space-y-3 text-sm">
-                    <div><span class="font-semibold">O2/Vent:</span> <input id="o2-delivery" class="w-full border-0 border-b p-0"></div>
-                    <div><span class="font-semibold">Breath Sounds:</span><textarea id="breath-sounds" class="w-full border-0 border-b resize-none p-0"></textarea></div>
+                    <div><span class="font-semibold">Oxygen Delivery:</span> <input id="o2-delivery" class="w-full border-0 border-b p-0" placeholder="BiPAP, HFM, NC @ 2L"></div>
+                    <div><span class="font-semibold">Ventilator Settings:</span><input id="vent-settings" class="w-full border-0 border-b p-0" placeholder="AC/VC, Rate 12, TV 450, PEEP 8"></div>
+                    <div><span class="font-semibold">Trach/Airway:</span><input id="trach-airway" class="w-full border-0 border-b p-0" placeholder="Size 7, cuffed, last change date"></div>
+                    <div><span class="font-semibold">Breath Sounds:</span><textarea id="breath-sounds" class="w-full border-0 border-b resize-none p-0" placeholder="Coarse in RLL, CTA elsewhere"></textarea></div>
+                </div>
+            </div>
+            <!-- GI/GU Section -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">GI / GU</h2>
+                <div class="space-y-3 text-sm">
+                    <div><span class="font-semibold">Diet/Feeds:</span> <input id="diet" class="w-full border-0 border-b p-0" placeholder="NPO, Tube Feeds @ 50/hr"></div>
+                    <div><span class="font-semibold">Abdomen/Bowel:</span> <input id="abdomen" class="w-full border-0 border-b p-0" placeholder="Soft, last BM yesterday"></div>
+                    <div><span class="font-semibold">Urine Output:</span> <input id="urine-output" class="w-full border-0 border-b p-0" placeholder="Foley, >30mL/hr, clear"></div>
+                </div>
+            </div>
+            <!-- Access Section -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Access</h2>
+                 <div class="space-y-3 text-sm">
+                    <div><span class="font-semibold">IV Lines:</span> <input id="iv-lines" class="w-full border-0 border-b p-0" placeholder="20g LFA, 18g RAC"></div>
+                    <div><span class="font-semibold">Central Line:</span> <input id="central-line" class="w-full border-0 border-b p-0" placeholder="TLC R IJ, HD line L Fem"></div>
+                    <div><span class="font-semibold">Other Drains/Tubes:</span> <input id="drains-tubes" class="w-full border-0 border-b p-0" placeholder="Chest tube, NG tube"></div>
+                </div>
+            </div>
+             <!-- Integumentary/MSK Section -->
+            <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Integumentary / MSK</h2>
+                 <div class="space-y-3 text-sm">
+                    <div><span class="font-semibold">Skin Integrity:</span> <input id="skin-integrity" class="w-full border-0 border-b p-0" placeholder="Sacral ulcer Stage 2, dressing CDI"></div>
+                    <div><span class="font-semibold">Mobility/Strength:</span> <input id="mobility-strength" class="w-full border-0 border-b p-0" placeholder="MAE, bedrest, moves R>L"></div>
                 </div>
             </div>
         </div>
@@ -73,18 +102,31 @@
         <!-- Key Information Textareas -->
         <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Key Labs / Diagnostics</h2>
+                <textarea id="labs-diagnostics" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., K: 3.2, WBC: 15.1, Lactate: 4.2..."></textarea>
+            </div>
+            <div>
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Family Communication</h2>
+                <textarea id="family-communication" class="w-full h-24 border rounded-lg p-2" placeholder="Spokesperson, last update, concerns..."></textarea>
+            </div>
+        </section>
+
+        <!-- UPDATED: Drips & Meds Section -->
+        <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div>
                 <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">IV Drips / Infusions</h2>
                 <textarea id="drips" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Norepinephrine @ 10 mcg/min..."></textarea>
             </div>
             <div>
-                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Key Labs / Diagnostics</h2>
-                <textarea id="labs-diagnostics" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., K: 3.2, WBC: 15.1, Lactate: 4.2..."></textarea>
+                <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Scheduled Medications</h2>
+                <textarea id="medications" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Antibiotics, PRN pain meds..."></textarea>
             </div>
         </section>
-        
+
+        <!-- UPDATED: Plan for Shift Section -->
         <section class="mt-6">
-            <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Plan for the Shift</h2>
-            <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
+             <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Plan for the Shift</h2>
+             <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
         </section>
     </div>
 
@@ -161,7 +203,7 @@
         reportContent.classList.add('hidden');
         
         try {
-            // This is the CRUCIAL change. We now call our own backend function.
+            // This calls your secure backend function on Netlify
             const response = await fetch('/.netlify/functions/generate-sbar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
