@@ -158,18 +158,21 @@
 
     <!-- SBAR Generation Modal -->
     <div id="sbar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <!-- **THIS IS THE UPDATED MODAL STRUCTURE** -->
         <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95 max-h-[90vh] flex flex-col">
-             <div class="p-6">
-                <div class="flex justify-between items-center border-b pb-3 mb-4">
+            <!-- Modal Header (fixed) -->
+            <div class="p-6 pb-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
                     <h2 class="text-2xl font-bold text-gray-800">Generated SBAR Report</h2>
-                    <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+                    <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
                 </div>
-                <!-- UPDATED: This is now a div to hold styled content, not a textarea -->
-                <div id="report-content-container" class="space-y-4 overflow-y-auto pr-2">
-                    <!-- Loading indicator will go here -->
-                </div>
-             </div>
-            <div class="bg-gray-100 p-4 mt-auto flex justify-end items-center gap-4 rounded-b-lg">
+            </div>
+            <!-- Scrollable Content Area -->
+            <div id="report-content-container" class="p-6 space-y-4 overflow-y-auto">
+                <!-- Loading indicator and content will be injected here by JavaScript -->
+            </div>
+            <!-- Modal Footer (fixed) -->
+            <div class="bg-gray-100 p-4 mt-auto flex justify-end items-center gap-4 rounded-b-lg border-t border-gray-200">
                 <span id="copy-success-msg" class="text-green-600 font-semibold hidden">Copied!</span>
                 <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg transition-colors">
                     Copy to Clipboard
@@ -191,7 +194,7 @@
         const userInfo = document.getElementById('user-info');
         const authBtn = document.getElementById('auth-btn');
 
-        let lastReportJson = null; // Store the last report for copying
+        let lastReportJson = null;
 
         function updateLoginState(user) {
             if (user) {
@@ -240,7 +243,6 @@
             return data;
         }
 
-        // --- UPDATED to handle the new JSON format and render styled HTML ---
         async function handleGenerateSbar() {
             const user = window.netlifyIdentity.currentUser();
             if (!user) {
@@ -274,7 +276,7 @@
                 }
 
                 const result = await response.json();
-                lastReportJson = result.report; // Save for copying
+                lastReportJson = result.report; 
                 renderReport(lastReportJson);
 
             } catch (error) {
@@ -283,7 +285,6 @@
             }
         }
         
-        // --- NEW function to render the styled report ---
         function renderReport(report) {
             const sectionColors = {
                 situation: 'bg-blue-50 border-blue-200',
@@ -309,12 +310,9 @@
             reportContentContainer.innerHTML = html;
         }
 
-
-        // --- UPDATED to copy the plain text version of the report ---
         function copyReportToClipboard() {
             if (!lastReportJson) return;
 
-            // Reconstruct the report into a plain text string for copying
             let plainText = '';
             for (const key in lastReportJson) {
                 if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
@@ -323,7 +321,6 @@
                 }
             }
 
-            // Use a temporary textarea to copy the text
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = plainText.trim();
             document.body.appendChild(tempTextArea);
