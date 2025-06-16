@@ -1,10 +1,19 @@
-// This file lives in the `netlify/functions` directory
-// It is a Node.js function that will run on Netlify's servers.
-// This version includes AI-powered clinical suggestions.
+// This file lives in the `netlify/functions` directory.
+// This is the SECURE, GATED version of the function.
+// It checks for a valid user before running.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 exports.handler = async function(event, context) {
+    // 1. Check if the user is authenticated.
+    // The `context.clientContext.user` object is automatically populated by Netlify Identity.
+    if (!context.clientContext || !context.clientContext.user) {
+        return {
+            statusCode: 401,
+            body: JSON.stringify({ error: 'You must be logged in to generate a report.' })
+        };
+    }
+
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -13,7 +22,6 @@ exports.handler = async function(event, context) {
     try {
         const { patientData } = JSON.parse(event.body);
 
-        // Your secret API key is retrieved from Netlify's environment variables.
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
@@ -22,7 +30,6 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // UPDATED PROMPT: Now asks for clinical suggestions in a new section.
         const prompt = `
             You are an expert Canadian ICU nurse acting as a clinical co-pilot.
             Your task is to perform two actions based on the provided patient data:
@@ -60,7 +67,6 @@ exports.handler = async function(event, context) {
         const result = await apiResponse.json();
         const reportText = result.candidates[0].content.parts[0].text;
         
-        // Send the generated report back to the frontend
         return {
             statusCode: 200,
             headers: { "Content-Type": "application/json" },
