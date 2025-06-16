@@ -5,7 +5,7 @@
 // We need 'fetch' in a Node.js environment. `node-fetch` is a common choice.
 // You'll need to add it to your project's dependencies.
 // Run `npm install node-fetch` in your project folder.
-const fetch = require('node-fetch');
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 exports.handler = async function(event, context) {
     // Only allow POST requests
