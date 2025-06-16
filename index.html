@@ -57,7 +57,7 @@
                 </section>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- UPDATED: Neurological -->
+                    <!-- Neurological -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Neurological</h2>
                         <div class="space-y-3 text-sm">
@@ -108,7 +108,7 @@
                             <div><span class="font-semibold">Other Drains/Tubes:</span> <input id="drains-tubes" class="w-full border-0 border-b p-0" placeholder="Chest tube, NG tube"></div>
                         </div>
                     </div>
-                    <!-- UPDATED: Integumentary/MSK Section -->
+                    <!-- Integumentary/MSK Section -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Integumentary / MSK</h2>
                          <div class="space-y-3 text-sm">
@@ -158,24 +158,18 @@
 
     <!-- SBAR Generation Modal -->
     <div id="sbar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95">
+        <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95 max-h-[90vh] flex flex-col">
              <div class="p-6">
                 <div class="flex justify-between items-center border-b pb-3 mb-4">
                     <h2 class="text-2xl font-bold text-gray-800">Generated SBAR Report</h2>
                     <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
                 </div>
-                <div id="modal-body" class="relative">
-                    <div id="loading-indicator" class="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center rounded-lg hidden">
-                        <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div>
-                        <p class="text-lg font-semibold text-gray-600">Generating report, please wait...</p>
-                    </div>
-                    <div id="report-content" class="space-y-4">
-                        <p class="text-sm text-gray-600">Review the generated report below. You can edit it here before copying.</p>
-                        <textarea id="sbar-report-text" class="w-full h-96 p-3 border rounded-md bg-gray-50 text-sm font-mono"></textarea>
-                    </div>
+                <!-- UPDATED: This is now a div to hold styled content, not a textarea -->
+                <div id="report-content-container" class="space-y-4 overflow-y-auto pr-2">
+                    <!-- Loading indicator will go here -->
                 </div>
-            </div>
-            <div class="bg-gray-100 p-4 flex justify-end items-center gap-4 rounded-b-lg">
+             </div>
+            <div class="bg-gray-100 p-4 mt-auto flex justify-end items-center gap-4 rounded-b-lg">
                 <span id="copy-success-msg" class="text-green-600 font-semibold hidden">Copied!</span>
                 <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg transition-colors">
                     Copy to Clipboard
@@ -189,15 +183,15 @@
         const generateBtn = document.getElementById('generate-sbar-btn');
         const modal = document.getElementById('sbar-modal');
         const closeModalBtn = document.getElementById('close-modal-btn');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const reportContent = document.getElementById('report-content');
-        const sbarReportText = document.getElementById('sbar-report-text');
+        const reportContentContainer = document.getElementById('report-content-container');
         const copyReportBtn = document.getElementById('copy-report-btn');
         const copySuccessMsg = document.getElementById('copy-success-msg');
         const form = document.getElementById('assessment-form');
         const formOverlay = document.getElementById('form-overlay');
         const userInfo = document.getElementById('user-info');
-        const authBtn = document.getElementById('auth-btn'); // Use the new ID
+        const authBtn = document.getElementById('auth-btn');
+
+        let lastReportJson = null; // Store the last report for copying
 
         function updateLoginState(user) {
             if (user) {
@@ -213,7 +207,6 @@
             }
         }
 
-        // UPDATED: Added click listener for explicit login/logout
         authBtn.addEventListener('click', () => {
             const user = window.netlifyIdentity.currentUser();
             if (user) {
@@ -247,6 +240,7 @@
             return data;
         }
 
+        // --- UPDATED to handle the new JSON format and render styled HTML ---
         async function handleGenerateSbar() {
             const user = window.netlifyIdentity.currentUser();
             if (!user) {
@@ -261,42 +255,82 @@
             }
 
             openModal();
-            loadingIndicator.classList.remove('hidden');
-            reportContent.classList.add('hidden');
+            reportContentContainer.innerHTML = `
+                <div class="absolute inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center rounded-lg">
+                    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div>
+                    <p class="text-lg font-semibold text-gray-600">Generating report, please wait...</p>
+                </div>`;
             
             try {
                 const response = await fetch('/.netlify/functions/generate-sbar', {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${user.token.access_token}`
-                    },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
                     body: JSON.stringify({ patientData: formData })
                 });
 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    if (response.status === 401) {
-                         throw new Error("Authentication error. Please log in again.");
-                    }
                     throw new Error(errorData.error || `Request failed with status ${response.status}`);
                 }
 
                 const result = await response.json();
-                sbarReportText.value = result.report;
+                lastReportJson = result.report; // Save for copying
+                renderReport(lastReportJson);
 
             } catch (error) {
                 console.error("Error calling backend function:", error);
-                sbarReportText.value = `An error occurred: ${error.message}`;
-            } finally {
-                loadingIndicator.classList.add('hidden');
-                reportContent.classList.remove('hidden');
+                reportContentContainer.innerHTML = `<p class="text-red-500 font-semibold">An error occurred: ${error.message}</p>`;
             }
         }
+        
+        // --- NEW function to render the styled report ---
+        function renderReport(report) {
+            const sectionColors = {
+                situation: 'bg-blue-50 border-blue-200',
+                background: 'bg-indigo-50 border-indigo-200',
+                assessment: 'bg-green-50 border-green-200',
+                recommendation: 'bg-amber-50 border-amber-200',
+                suggestions: 'bg-rose-50 border-rose-200'
+            };
 
+            let html = '';
+            for (const key in report) {
+                if (Object.hasOwnProperty.call(report, key) && report[key]) {
+                    const title = key.charAt(0).toUpperCase() + key.slice(1);
+                    const colorClasses = sectionColors[key] || 'bg-gray-50 border-gray-200';
+                    html += `
+                        <div class="p-4 rounded-lg border ${colorClasses} mb-4">
+                            <h3 class="text-lg font-bold text-gray-800 mb-2">${title.replace(/_/g, ' ')}</h3>
+                            <p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p>
+                        </div>
+                    `;
+                }
+            }
+            reportContentContainer.innerHTML = html;
+        }
+
+
+        // --- UPDATED to copy the plain text version of the report ---
         function copyReportToClipboard() {
-            sbarReportText.select();
+            if (!lastReportJson) return;
+
+            // Reconstruct the report into a plain text string for copying
+            let plainText = '';
+            for (const key in lastReportJson) {
+                if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
+                     const title = (key.charAt(0).toUpperCase() + key.slice(1)).replace(/_/g, ' ');
+                     plainText += `**${title}**\n${lastReportJson[key]}\n\n`;
+                }
+            }
+
+            // Use a temporary textarea to copy the text
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = plainText.trim();
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
             document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
             copySuccessMsg.classList.remove('hidden');
             setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
         }
