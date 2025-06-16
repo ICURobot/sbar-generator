@@ -45,11 +45,18 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // UPDATED PROMPT: Asks for a JSON object.
+        // UPDATED PROMPT: Asks for a specific format for the Assessment section.
         const prompt = `
             You are an expert Canadian ICU nurse. Based on the provided patient data, generate a report as a JSON object.
             The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
-            - The SBAR sections should be concise and professional for handoff.
+            
+            - For the "assessment" key, synthesize the data into a systems-based summary. Each system must start on a new line with the system name followed by a colon. For example:
+              "Neurologically: ...
+              Cardiovascularly: ...
+              Respiratory: ...
+              GI/GU: ...
+              Skin/MSK: ...
+              Access: ..."
             - The "suggestions" key should contain a few bullet points for clinical considerations, followed by the disclaimer.
             - Use Canadian medical terminology. Do not include any extra text or markdown formatting outside of the JSON structure.
 
