@@ -1,12 +1,27 @@
 // This file lives in the `netlify/functions` directory.
-// This is the SECURE, GATED version of the function.
-// It checks for a valid user before running.
+// This is the SECURE, GATED version with USAGE TRACKING.
+// It checks for a valid user and tracks their usage in Firestore.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
+// 1. Add the Firebase Admin SDK
+const admin = require('firebase-admin');
+
+// 2. Initialize Firebase Admin, but only if it hasn't been already.
+// This is important for serverless environments.
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // The private key needs special handling to parse correctly from an environment variable.
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+
+const db = admin.firestore();
 
 exports.handler = async function(event, context) {
-    // 1. Check if the user is authenticated.
-    // The `context.clientContext.user` object is automatically populated by Netlify Identity.
     if (!context.clientContext || !context.clientContext.user) {
         return {
             statusCode: 401,
@@ -14,14 +29,34 @@ exports.handler = async function(event, context) {
         };
     }
 
-    // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
-        const { patientData } = JSON.parse(event.body);
+        // --- This is the new usage tracking logic ---
+        const user = context.clientContext.user;
+        const userRef = db.collection('users').doc(user.sub); // 'sub' is the unique user ID from Netlify Identity
+        
+        const doc = await userRef.get();
+        if (!doc.exists) {
+            // If the user is new, create their record
+            await userRef.set({
+                email: user.email,
+                usage_count: 1,
+                last_used: new Date().toISOString(),
+            });
+        } else {
+            // If they exist, increment their usage count
+            await userRef.update({
+                usage_count: admin.firestore.FieldValue.increment(1),
+                last_used: new Date().toISOString(),
+            });
+        }
+        // --- End of new usage tracking logic ---
 
+
+        const { patientData } = JSON.parse(event.body);
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
