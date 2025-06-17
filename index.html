@@ -117,7 +117,7 @@
                             <div><span class="font-semibold">Urine Output:</span> <input id="urine-output" class="w-full border-0 border-b p-0" placeholder="Foley, >30mL/hr, clear"></div>
                         </div>
                     </div>
-                    <!-- UPDATED: Access Section -->
+                    <!-- Access Section -->
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Access</h2>
                          <div class="space-y-3 text-sm">
@@ -377,14 +377,16 @@
                 background: 'bg-indigo-50 border-indigo-200 text-indigo-800',
                 assessment: 'bg-green-50 border-green-200 text-green-800',
                 recommendation: 'bg-amber-50 border-amber-200 text-amber-800',
-                suggestions: 'bg-rose-50 border-rose-200 text-rose-800'
+                ai_suggestion: 'bg-rose-50 border-rose-200 text-rose-800' // Use a different key for styling
             };
 
             let html = '';
             for (const key in report) {
                 if (Object.hasOwnProperty.call(report, key) && report[key]) {
-                    const title = key.charAt(0).toUpperCase() + key.slice(1);
-                    html += `<div class="p-4 rounded-lg border ${sectionColors[key] || 'bg-gray-50 border-gray-200'} shadow-sm"><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3><p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p></div>`;
+                    // UPDATED: Change the title for the suggestions key
+                    const title = key === 'ai_suggestion' ? 'AI Suggestion' : (key.charAt(0).toUpperCase() + key.slice(1));
+                    const colorClasses = sectionColors[key] || 'bg-gray-50 border-gray-200';
+                    html += `<div class="p-4 rounded-lg border ${colorClasses} shadow-sm"><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3><p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p></div>`;
                 }
             }
             reportContentContainer.innerHTML = html;
@@ -395,7 +397,7 @@
             let plainText = '';
             for (const key in lastReportJson) {
                 if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
-                     const title = `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
+                     const title = key === 'ai_suggestion' ? '**AI Suggestion**' : `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
                      plainText += `${title}\n${lastReportJson[key]}\n\n`;
                 }
             }
