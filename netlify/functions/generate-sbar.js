@@ -1,5 +1,5 @@
 // This file lives in the `netlify/functions` directory.
-// This is the simplified version where suggestions are always included.
+// This is the final, most robust version with a longer timeout and better error handling.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -38,14 +38,13 @@ exports.handler = async function(event, context) {
         }
         // --- End of usage tracking logic ---
 
-        const { patientData } = JSON.parse(event.body); // SIMPLIFIED: No longer need includeSuggestions
+        const { patientData } = JSON.parse(event.body);
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) throw new Error("API key is not configured.");
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
 
-        // SIMPLIFIED PROMPT: Always asks for suggestions
         const prompt = `
             You are an expert Canadian ICU Charge Nurse. Based on the provided patient data, generate a report as a JSON object.
             The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
@@ -60,7 +59,6 @@ exports.handler = async function(event, context) {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
                 responseMimeType: "application/json",
-                // SIMPLIFIED SCHEMA: Always includes suggestions
                 responseSchema: {
                     type: "OBJECT",
                     properties: {
@@ -87,8 +85,16 @@ exports.handler = async function(event, context) {
         }
 
         const result = await apiResponse.json();
-        const reportText = result.candidates[0].content.parts[0].text;
-        const reportJson = JSON.parse(reportText);
+        
+        // --- NEW: More robust JSON parsing ---
+        let reportJson;
+        try {
+            const reportText = result.candidates[0].content.parts[0].text;
+            reportJson = JSON.parse(reportText);
+        } catch (parseError) {
+             console.error("JSON Parsing Error:", parseError);
+             throw new Error("The AI returned an invalid response. Please try again.");
+        }
         
         return {
             statusCode: 200,
