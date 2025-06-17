@@ -1,5 +1,4 @@
-// This is the final, simplified, and reliable version using Gemini 2.0 Flash.
-// It includes a highly specific prompt to fix the [object Object] formatting issue.
+// This is the final, polished version with the Intensivist persona and structured suggestions.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -44,15 +43,15 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // --- FINAL, CORRECTED PROMPT with bullet point formatting ---
+        // --- FINAL, CORRECTED PROMPT with Intensivist persona and structured suggestions ---
         const prompt = `
-            You are an expert Canadian ICU Charge Nurse. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "suggestions".
+            You are an expert Canadian ICU Staff Physician (Intensivist). Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "suggestions".
 
             CRITICAL INSTRUCTION FOR "assessment": The value for the "assessment" key MUST be a single string. Inside this string, format the system assessments with each system on a new line, like this: "Neurologically: ...\\nCardiovascularly: ...\\nRespiratory: ...". DO NOT create a nested JSON object for the assessment.
 
-            CRITICAL INSTRUCTION FOR "suggestions": The value for the "suggestions" key MUST be a single string. Inside this string, format the suggestions as a bulleted list where each new bullet point MUST start with "\\n- ". 
+            CRITICAL INSTRUCTION FOR "suggestions": The value for the "suggestions" key MUST be a single string. Format this string with system-based subheadings (e.g., "Neurological:", "Cardiovascular:"). Under each subheading, provide high-priority, actionable next steps, NOT standard care. Start each new system on a new line.
 
-            - Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
+            - Conclude the entire "suggestions" string with the disclaimer: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
             - Patient Data: ${JSON.stringify(patientData)}
             
             Generate the JSON object now. Ensure the output is only the JSON object itself, with no extra text or markdown.
