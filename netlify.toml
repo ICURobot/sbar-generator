@@ -1,7 +1,6 @@
-# This file tells Netlify where your functions live and their settings.
+# This file tells Netlify where your functions live.
 [functions]
   directory = "netlify/functions/"
-  timeout = 25
 
 # This tells Netlify to install the dependencies for your functions.
 [build]
