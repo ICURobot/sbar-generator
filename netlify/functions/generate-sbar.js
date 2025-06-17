@@ -1,5 +1,5 @@
-// This file lives in the `netlify/functions` directory.
-// This is the final, most robust version with a longer timeout and better error handling.
+// This is the simplified, reliable version using Gemini 2.0 Flash.
+// It keeps the advanced prompt but removes complex features to ensure stability.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -36,41 +36,28 @@ exports.handler = async function(event, context) {
         } else {
             await userRef.update({ usage_count: admin.firestore.FieldValue.increment(1), last_used: new Date().toISOString() });
         }
-        // --- End of usage tracking logic ---
-
+        
         const { patientData } = JSON.parse(event.body);
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) throw new Error("API key is not configured.");
         
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
+        // --- REVERTED TO GEMINI 2.0 FLASH for speed and reliability ---
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
+        // Using the advanced prompt but asking for a clean, parsable JSON string
         const prompt = `
-            You are an expert Canadian ICU Charge Nurse. Based on the provided patient data, generate a report as a JSON object.
-            The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
-            - For the "assessment" key, structure it by system (Neurologically, etc.).
-            - For the "suggestions" key, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues, critical omissions, or specific, actionable next steps. Format this section as a bulleted list using '\\n- ' for each new point.
+            You are an expert Canadian ICU Charge Nurse. Your task is to generate a report as a JSON object with the keys "situation", "background", "assessment", "recommendation", and "suggestions".
+            - The report must be concise and professional for handoff to another experienced ICU nurse.
+            - For the "assessment", structure it by system (Neurologically, Cardiovascularly, etc.).
+            - For the "suggestions" section, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues or critical omissions.
             - Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
             - Patient Data: ${JSON.stringify(patientData)}
-            Generate the JSON object now.
+            Generate the JSON object now. Ensure the output is only the JSON object itself, with no extra text or markdown.
         `;
         
         const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: "OBJECT",
-                    properties: {
-                        situation: { type: "STRING" },
-                        background: { type: "STRING" },
-                        assessment: { type: "STRING" },
-                        recommendation: { type: "STRING" },
-                        suggestions: { type: "STRING" }
-                    },
-                    required: ["situation", "background", "assessment", "recommendation", "suggestions"]
-                },
-            },
+            contents: [{ parts: [{ text: prompt }] }]
         };
 
         const apiResponse = await fetch(apiUrl, {
@@ -86,10 +73,11 @@ exports.handler = async function(event, context) {
 
         const result = await apiResponse.json();
         
-        // --- NEW: More robust JSON parsing ---
         let reportJson;
         try {
-            const reportText = result.candidates[0].content.parts[0].text;
+            // Get the raw text and clean it just in case
+            let reportText = result.candidates[0].content.parts[0].text;
+            reportText = reportText.replace(/```json\n/g, '').replace(/\n```/g, '').trim();
             reportJson = JSON.parse(reportText);
         } catch (parseError) {
              console.error("JSON Parsing Error:", parseError);
