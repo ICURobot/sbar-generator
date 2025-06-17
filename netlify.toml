@@ -1,9 +1,6 @@
-# This file tells Netlify where your functions live.
+# This file tells Netlify where your functions live and their settings.
 [functions]
   directory = "netlify/functions/"
-
-# This increases the timeout for all functions to 25 seconds.
-[functions]
   timeout = 25
 
 # This tells Netlify to install the dependencies for your functions.
