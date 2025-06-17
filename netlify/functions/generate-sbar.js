@@ -1,10 +1,10 @@
 // This file lives in the `netlify/functions` directory.
-// This version returns a structured JSON object for beautiful formatting on the frontend.
+// This is the upgraded version using the Gemini 1.5 Pro model and advanced prompting.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
@@ -38,32 +38,39 @@ exports.handler = async function(event, context) {
         }
         // --- End of usage tracking logic ---
 
-        const { patientData } = JSON.parse(event.body);
+        const { patientData, includeSuggestions } = JSON.parse(event.body);
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) throw new Error("API key is not configured.");
         
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        // --- 1. UPGRADED MODEL ---
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
 
-        // UPDATED PROMPT: Asks for a specific format for the Assessment section.
-        const prompt = `
-            You are an expert Canadian ICU nurse. Based on the provided patient data, generate a report as a JSON object.
-            The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
+        // --- 2. ADVANCED PROMPT ---
+        let prompt = `
+            You are an expert Canadian ICU Charge Nurse with 20 years of experience. Your task is to generate a report as a JSON object with the keys "situation", "background", "assessment", and "recommendation".
             
-            - For the "assessment" key, synthesize the data into a systems-based summary. Each system must start on a new line with the system name followed by a colon. For example:
-              "Neurologically: ...
-              Cardiovascularly: ...
-              Respiratory: ...
-              GI/GU: ...
-              Skin/MSK: ...
-              Access: ..."
-            - The "suggestions" key should contain a few bullet points for clinical considerations, followed by the disclaimer.
-            - Use Canadian medical terminology. Do not include any extra text or markdown formatting outside of the JSON structure.
+            - The report must be extremely concise, professional, and targeted for handoff to another experienced ICU nurse.
+            - For the "assessment", structure it by system (Neurologically, Cardiovascularly, etc.).
+            - Synthesize the data. Do not simply list what was provided.
+        `;
+        
+        // Conditionally add the suggestions part based on the user's choice
+        if (includeSuggestions) {
+            prompt += `
+            
+            After the SBAR, add a "suggestions" key to the JSON object. 
+            In this section, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues, critical omissions, or specific, actionable next steps. For example, instead of "monitor electrolytes," suggest "suggest follow-up potassium level in 4 hours post-repletion."
+            
+            IMPORTANT: Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
+            `;
+        }
 
-            Patient Data:
+        prompt += `
+            Here is the patient data:
             ${JSON.stringify(patientData, null, 2)}
 
-            Generate the JSON object now:
+            Generate the JSON object now. Do not include any extra text or markdown formatting outside of the JSON structure.
         `;
 
         const payload = {
@@ -83,17 +90,15 @@ exports.handler = async function(event, context) {
 
         const result = await apiResponse.json();
         
-        // Extract the text and clean it up to ensure it's valid JSON
         let reportText = result.candidates[0].content.parts[0].text;
         reportText = reportText.replace(/```json\n/g, '').replace(/\n```/g, '').trim();
         
-        // Parse the text to a JSON object to send to the frontend
         const reportJson = JSON.parse(reportText);
         
         return {
             statusCode: 200,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ report: reportJson }) // Send the JSON object
+            body: JSON.stringify({ report: reportJson })
         };
 
     } catch (error) {
