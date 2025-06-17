@@ -1,4 +1,4 @@
-// This is the final, polished version with the Intensivist persona and structured suggestions.
+// This is the final, polished version with multiple AI personas.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -43,18 +43,19 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // --- FINAL, CORRECTED PROMPT with Intensivist persona and structured suggestions ---
+        // --- FINAL, MULTI-PERSONA PROMPT ---
         const prompt = `
-            You are an expert Canadian ICU Staff Physician (Intensivist). Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "suggestions".
+            You are a multi-persona AI assistant for ICU nurses. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "ai_suggestion".
 
-            CRITICAL INSTRUCTION FOR "assessment": The value for the "assessment" key MUST be a single string. Inside this string, format the system assessments with each system on a new line, like this: "Neurologically: ...\\nCardiovascularly: ...\\nRespiratory: ...". DO NOT create a nested JSON object for the assessment.
+            INSTRUCTION FOR EACH KEY:
+            - "situation", "background", "assessment": Synthesize the data concisely. For "assessment", format it by system (Neurologically:, Cardiovascularly:, etc.).
+            - "recommendation": Act as an experienced ICU Charge Nurse. Provide a practical, actionable to-do list for the next nurse's shift.
+            - "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations and diagnostic thoughts. Structure this by system (Neurological:, Cardiovascular:, etc.). Do NOT state obvious standard-of-care. Conclude with the disclaimer: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
 
-            CRITICAL INSTRUCTION FOR "suggestions": The value for the "suggestions" key MUST be a single string. Format this string with system-based subheadings (e.g., "Neurological:", "Cardiovascular:"). Under each subheading, provide high-priority, actionable next steps, NOT standard care. Start each new system on a new line.
-
-            - Conclude the entire "suggestions" string with the disclaimer: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
+            - Use Canadian medical terminology.
             - Patient Data: ${JSON.stringify(patientData)}
             
-            Generate the JSON object now. Ensure the output is only the JSON object itself, with no extra text or markdown.
+            Generate the JSON object now. Ensure the output is only the JSON object itself.
         `;
         
         const payload = {
