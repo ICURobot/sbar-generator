@@ -44,13 +44,14 @@ exports.handler = async function(event, context) {
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // --- FINAL, CORRECTED PROMPT ---
+        // --- FINAL, CORRECTED PROMPT with bullet point formatting ---
         const prompt = `
             You are an expert Canadian ICU Charge Nurse. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "suggestions".
 
             CRITICAL INSTRUCTION FOR "assessment": The value for the "assessment" key MUST be a single string. Inside this string, format the system assessments with each system on a new line, like this: "Neurologically: ...\\nCardiovascularly: ...\\nRespiratory: ...". DO NOT create a nested JSON object for the assessment.
 
-            - For "suggestions", provide only high-priority, actionable next steps, not standard care.
+            CRITICAL INSTRUCTION FOR "suggestions": The value for the "suggestions" key MUST be a single string. Inside this string, format the suggestions as a bulleted list where each new bullet point MUST start with "\\n- ". 
+
             - Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
             - Patient Data: ${JSON.stringify(patientData)}
             
