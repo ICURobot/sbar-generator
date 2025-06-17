@@ -1,5 +1,5 @@
 // This file lives in the `netlify/functions` directory.
-// This is the upgraded version using the Gemini 1.5 Pro model and advanced prompting.
+// This is the final, most robust version using the Gemini 1.5 Pro model in JSON Mode.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -43,38 +43,35 @@ exports.handler = async function(event, context) {
 
         if (!apiKey) throw new Error("API key is not configured.");
         
-        // --- 1. UPGRADED MODEL ---
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
 
-        // --- 2. ADVANCED PROMPT ---
+        // --- UPDATED PROMPT: Simplified for JSON mode ---
         let prompt = `
-            You are an expert Canadian ICU Charge Nurse with 20 years of experience. Your task is to generate a report as a JSON object with the keys "situation", "background", "assessment", and "recommendation".
-            
-            - The report must be extremely concise, professional, and targeted for handoff to another experienced ICU nurse.
+            You are an expert Canadian ICU Charge Nurse creating a handoff report.
             - For the "assessment", structure it by system (Neurologically, Cardiovascularly, etc.).
-            - Synthesize the data. Do not simply list what was provided.
+            - If suggestions are requested, provide ONLY high-priority, actionable next steps, not standard care.
+            - Patient Data: ${JSON.stringify(patientData)}
         `;
         
-        // Conditionally add the suggestions part based on the user's choice
-        if (includeSuggestions) {
-            prompt += `
-            
-            After the SBAR, add a "suggestions" key to the JSON object. 
-            In this section, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues, critical omissions, or specific, actionable next steps. For example, instead of "monitor electrolytes," suggest "suggest follow-up potassium level in 4 hours post-repletion."
-            
-            IMPORTANT: Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
-            `;
-        }
-
-        prompt += `
-            Here is the patient data:
-            ${JSON.stringify(patientData, null, 2)}
-
-            Generate the JSON object now. Do not include any extra text or markdown formatting outside of the JSON structure.
-        `;
-
+        // --- NEW PAYLOAD with JSON MODE ENABLED ---
         const payload = {
-            contents: [{ parts: [{ text: prompt }] }]
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: "OBJECT",
+                    properties: {
+                        situation: { type: "STRING" },
+                        background: { type: "STRING" },
+                        assessment: { type: "STRING" },
+                        recommendation: { type: "STRING" },
+                        // Only include suggestions in the schema if requested
+                        ...(includeSuggestions && { 
+                            suggestions: { type: "STRING" }
+                        })
+                    },
+                },
+            },
         };
 
         const apiResponse = await fetch(apiUrl, {
@@ -90,10 +87,8 @@ exports.handler = async function(event, context) {
 
         const result = await apiResponse.json();
         
-        let reportText = result.candidates[0].content.parts[0].text;
-        reportText = reportText.replace(/```json\n/g, '').replace(/\n```/g, '').trim();
-        
-        const reportJson = JSON.parse(reportText);
+        const reportText = result.candidates[0].content.parts[0].text;
+        const reportJson = JSON.parse(reportText); // This is now much safer
         
         return {
             statusCode: 200,
