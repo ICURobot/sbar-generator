@@ -1,5 +1,5 @@
 // This file lives in the `netlify/functions` directory.
-// This is the final, most robust version using the Gemini 1.5 Pro model in JSON Mode.
+// This is the simplified version where suggestions are always included.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -38,26 +38,29 @@ exports.handler = async function(event, context) {
         }
         // --- End of usage tracking logic ---
 
-        const { patientData, includeSuggestions } = JSON.parse(event.body);
+        const { patientData } = JSON.parse(event.body); // SIMPLIFIED: No longer need includeSuggestions
         const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) throw new Error("API key is not configured.");
         
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
 
-        // --- UPDATED PROMPT: Simplified for JSON mode ---
-        let prompt = `
-            You are an expert Canadian ICU Charge Nurse creating a handoff report.
-            - For the "assessment", structure it by system (Neurologically, Cardiovascularly, etc.).
-            - If suggestions are requested, provide ONLY high-priority, actionable next steps, not standard care.
+        // SIMPLIFIED PROMPT: Always asks for suggestions
+        const prompt = `
+            You are an expert Canadian ICU Charge Nurse. Based on the provided patient data, generate a report as a JSON object.
+            The JSON object must have these exact keys: "situation", "background", "assessment", "recommendation", and "suggestions".
+            - For the "assessment" key, structure it by system (Neurologically, etc.).
+            - For the "suggestions" key, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues, critical omissions, or specific, actionable next steps. Format this section as a bulleted list using '\\n- ' for each new point.
+            - Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
             - Patient Data: ${JSON.stringify(patientData)}
+            Generate the JSON object now.
         `;
         
-        // --- NEW PAYLOAD with JSON MODE ENABLED ---
         const payload = {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
                 responseMimeType: "application/json",
+                // SIMPLIFIED SCHEMA: Always includes suggestions
                 responseSchema: {
                     type: "OBJECT",
                     properties: {
@@ -65,11 +68,9 @@ exports.handler = async function(event, context) {
                         background: { type: "STRING" },
                         assessment: { type: "STRING" },
                         recommendation: { type: "STRING" },
-                        // Only include suggestions in the schema if requested
-                        ...(includeSuggestions && { 
-                            suggestions: { type: "STRING" }
-                        })
+                        suggestions: { type: "STRING" }
                     },
+                    required: ["situation", "background", "assessment", "recommendation", "suggestions"]
                 },
             },
         };
@@ -86,9 +87,8 @@ exports.handler = async function(event, context) {
         }
 
         const result = await apiResponse.json();
-        
         const reportText = result.candidates[0].content.parts[0].text;
-        const reportJson = JSON.parse(reportText); // This is now much safer
+        const reportJson = JSON.parse(reportText);
         
         return {
             statusCode: 200,
