@@ -1,5 +1,5 @@
-// This is the simplified, reliable version using Gemini 2.0 Flash.
-// It keeps the advanced prompt but removes complex features to ensure stability.
+// This is the final, simplified, and reliable version using Gemini 2.0 Flash.
+// It includes a highly specific prompt to fix the [object Object] formatting issue.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -42,17 +42,18 @@ exports.handler = async function(event, context) {
 
         if (!apiKey) throw new Error("API key is not configured.");
         
-        // --- REVERTED TO GEMINI 2.0 FLASH for speed and reliability ---
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // Using the advanced prompt but asking for a clean, parsable JSON string
+        // --- FINAL, CORRECTED PROMPT ---
         const prompt = `
-            You are an expert Canadian ICU Charge Nurse. Your task is to generate a report as a JSON object with the keys "situation", "background", "assessment", "recommendation", and "suggestions".
-            - The report must be concise and professional for handoff to another experienced ICU nurse.
-            - For the "assessment", structure it by system (Neurologically, Cardiovascularly, etc.).
-            - For the "suggestions" section, act as a clinical safety net. Do NOT state obvious standard-of-care. Focus ONLY on high-priority issues or critical omissions.
+            You are an expert Canadian ICU Charge Nurse. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "suggestions".
+
+            CRITICAL INSTRUCTION FOR "assessment": The value for the "assessment" key MUST be a single string. Inside this string, format the system assessments with each system on a new line, like this: "Neurologically: ...\\nCardiovascularly: ...\\nRespiratory: ...". DO NOT create a nested JSON object for the assessment.
+
+            - For "suggestions", provide only high-priority, actionable next steps, not standard care.
             - Conclude the suggestions with the disclaimer: "Disclaimer: AI-generated suggestions do not replace professional clinical judgment."
             - Patient Data: ${JSON.stringify(patientData)}
+            
             Generate the JSON object now. Ensure the output is only the JSON object itself, with no extra text or markdown.
         `;
         
@@ -75,12 +76,11 @@ exports.handler = async function(event, context) {
         
         let reportJson;
         try {
-            // Get the raw text and clean it just in case
             let reportText = result.candidates[0].content.parts[0].text;
             reportText = reportText.replace(/```json\n/g, '').replace(/\n```/g, '').trim();
             reportJson = JSON.parse(reportText);
         } catch (parseError) {
-             console.error("JSON Parsing Error:", parseError);
+             console.error("JSON Parsing Error:", parseError, "Raw text:", result.candidates[0].content.parts[0].text);
              throw new Error("The AI returned an invalid response. Please try again.");
         }
         
