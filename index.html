@@ -23,7 +23,7 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- NEW: Privacy Disclaimer Modal -->
+    <!-- Privacy Disclaimer Modal -->
     <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 text-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -42,6 +42,8 @@
         <!-- Login/Logout section -->
         <div id="auth-container" class="bg-white rounded-lg shadow-md p-4 mb-6 flex justify-between items-center">
             <div id="user-info" class="text-sm font-medium text-gray-600">Please log in to use the generator.</div>
+            <!-- Auto-save status will be added here by JS -->
+            <div id="save-status" class="text-sm text-green-600 font-semibold"></div>
             <button id="auth-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
         </div>
 
@@ -53,9 +55,10 @@
             </div>
             
             <div id="assessment-form" class="bg-white rounded-lg shadow-2xl p-6 md:p-8">
-                <!-- Header Section -->
-                <header class="border-b-2 border-gray-200 pb-4 mb-6 text-center">
+                <!-- Header and Clear Form Button -->
+                <header class="border-b-2 border-gray-200 pb-4 mb-6 flex justify-between items-center">
                     <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ICU SBAR Report Generator</h1>
+                    <button id="clear-form-btn" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1 px-3 rounded-md">Clear Form</button>
                 </header>
 
                 <!-- All form fields go here -->
@@ -174,7 +177,7 @@
     <!-- SBAR Generation Modal -->
     <div id="sbar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
         <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95 max-h-[90vh] flex flex-col">
-            <!-- Modal Header (fixed) -->
+            <!-- Modal Header -->
             <div class="p-6 pb-4 border-b border-gray-200">
                 <div class="flex justify-between items-center">
                     <h2 class="text-2xl font-bold text-gray-800">Generated SBAR Report</h2>
@@ -185,7 +188,7 @@
             <div id="report-content-container" class="p-6 space-y-4 overflow-y-auto">
                 <!-- Loading indicator and content will be injected here by JavaScript -->
             </div>
-            <!-- Modal Footer (fixed) -->
+            <!-- Modal Footer -->
             <div class="bg-gray-100 p-4 mt-auto flex justify-end items-center gap-4 rounded-b-lg border-t border-gray-200">
                 <span id="copy-success-msg" class="text-green-600 font-semibold hidden">Copied!</span>
                 <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg transition-colors">
@@ -209,35 +212,91 @@
         const authBtn = document.getElementById('auth-btn');
         const privacyModal = document.getElementById('privacy-modal');
         const closePrivacyModalBtn = document.getElementById('close-privacy-modal');
+        const saveStatus = document.getElementById('save-status');
+        const clearFormBtn = document.getElementById('clear-form-btn');
 
         let lastReportJson = null;
+        let saveTimeout;
 
-        // --- NEW Privacy Disclaimer Logic ---
+        // --- Privacy Disclaimer Logic ---
         function checkPrivacyDisclaimer() {
-            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const today = new Date().toISOString().split('T')[0];
             const lastShown = localStorage.getItem('disclaimerShownDate');
             if (lastShown !== today) {
                 privacyModal.classList.remove('hidden');
             }
         }
-
         closePrivacyModalBtn.addEventListener('click', () => {
             privacyModal.classList.add('hidden');
             const today = new Date().toISOString().split('T')[0];
             localStorage.setItem('disclaimerShownDate', today);
         });
-
-        // Run the check when the page loads
         checkPrivacyDisclaimer();
-        // --- End of Privacy Logic ---
+        
+        // --- NEW Auto-Save and Load Logic ---
+        async function saveDraft() {
+            const user = window.netlifyIdentity.currentUser();
+            if (!user) return; // Don't save if not logged in
+
+            const formData = collectFormData();
+            saveStatus.textContent = 'Saving...';
+            
+            await fetch('/.netlify/functions/form-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
+                body: JSON.stringify({ formData })
+            });
+
+            saveStatus.textContent = 'Draft Saved!';
+            setTimeout(() => { saveStatus.textContent = ''; }, 2000);
+        }
+
+        async function loadDraft(user) {
+            if (!user) return;
+            try {
+                const response = await fetch('/.netlify/functions/form-data', {
+                    headers: { 'Authorization': `Bearer ${user.token.access_token}` }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    populateForm(data.formData);
+                }
+            } catch (error) {
+                console.error("Could not load draft:", error);
+            }
+        }
+        
+        function populateForm(formData) {
+            for (const key in formData) {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.value = formData[key];
+                }
+            }
+        }
+
+        // Add event listener to all form inputs for auto-saving
+        form.addEventListener('input', () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveDraft, 2000); // Save 2 seconds after user stops typing
+        });
+        
+        clearFormBtn.addEventListener('click', () => {
+            if(confirm('Are you sure you want to clear the entire form? This cannot be undone.')) {
+                form.querySelectorAll('input, textarea').forEach(el => el.value = '');
+                saveDraft(); // Save the cleared state
+            }
+        });
 
 
+        // --- Authentication Logic ---
         function updateLoginState(user) {
             if (user) {
                 userInfo.textContent = `Welcome, ${user.email}!`;
                 authBtn.textContent = 'Log Out';
                 formOverlay.classList.add('hidden');
                 generateBtn.disabled = false;
+                loadDraft(user); // Load draft on login
             } else {
                 userInfo.textContent = 'Please log in to use the generator.';
                 authBtn.textContent = 'Log In / Sign Up';
@@ -249,7 +308,7 @@
         authBtn.addEventListener('click', () => {
             const user = window.netlifyIdentity.currentUser();
             if (user) {
-                window.netlifyIdentity.logout();
+                saveDraft().then(() => window.netlifyIdentity.logout());
             } else {
                 window.netlifyIdentity.open();
             }
@@ -264,6 +323,7 @@
             netlifyIdentity.on('logout', () => updateLoginState(null));
         }
 
+        // --- SBAR Generation and Modal Logic ---
         generateBtn.addEventListener('click', handleGenerateSbar);
         closeModalBtn.addEventListener('click', closeModal);
         modal.addEventListener('click', (e) => e.target === modal && closeModal());
@@ -280,11 +340,9 @@
         }
 
         async function handleGenerateSbar() {
+            await saveDraft(); // Ensure latest changes are saved before generating
             const user = window.netlifyIdentity.currentUser();
-            if (!user) {
-                alert("You must be logged in to generate a report.");
-                return;
-            }
+            if (!user) return;
 
             const formData = collectFormData();
             if (Object.keys(formData).length === 0) {
@@ -293,11 +351,7 @@
             }
 
             openModal();
-            reportContentContainer.innerHTML = `
-                <div class="flex flex-col items-center justify-center h-full">
-                    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div>
-                    <p class="text-lg font-semibold text-gray-600">Generating report, please wait...</p>
-                </div>`;
+            reportContentContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div><p class="text-lg font-semibold text-gray-600">Generating report...</p></div>`;
             
             try {
                 const response = await fetch('/.netlify/functions/generate-sbar', {
@@ -316,7 +370,6 @@
                 renderReport(lastReportJson);
 
             } catch (error) {
-                console.error("Error calling backend function:", error);
                 reportContentContainer.innerHTML = `<p class="text-red-500 font-semibold">An error occurred: ${error.message}</p>`;
             }
         }
@@ -334,13 +387,7 @@
             for (const key in report) {
                 if (Object.hasOwnProperty.call(report, key) && report[key]) {
                     const title = key.charAt(0).toUpperCase() + key.slice(1);
-                    const colorClasses = sectionColors[key] || 'bg-gray-50 border-gray-200';
-                    html += `
-                        <div class="p-4 rounded-lg border ${colorClasses} shadow-sm">
-                            <h3 class="text-lg font-bold text-gray-900 mb-2">${title.replace(/_/g, ' ')}</h3>
-                            <p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p>
-                        </div>
-                    `;
+                    html += `<div class="p-4 rounded-lg border ${sectionColors[key] || 'bg-gray-50 border-gray-200'} shadow-sm"><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3><p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p></div>`;
                 }
             }
             reportContentContainer.innerHTML = html;
@@ -348,22 +395,19 @@
 
         function copyReportToClipboard() {
             if (!lastReportJson) return;
-
             let plainText = '';
             for (const key in lastReportJson) {
                 if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
-                     const title = (key.charAt(0).toUpperCase() + key.slice(1)).replace(/_/g, ' ');
-                     plainText += `**${title}**\n${lastReportJson[key]}\n\n`;
+                     const title = `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
+                     plainText += `${title}\n${lastReportJson[key]}\n\n`;
                 }
             }
-
             const tempTextArea = document.createElement('textarea');
             tempTextArea.value = plainText.trim();
             document.body.appendChild(tempTextArea);
             tempTextArea.select();
             document.execCommand('copy');
             document.body.removeChild(tempTextArea);
-
             copySuccessMsg.classList.remove('hidden');
             setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
         }
