@@ -1,4 +1,4 @@
-// This is the final, polished version with multiple AI personas.
+// This is the advanced version with live Health Canada Drug Product Database integration.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
@@ -16,6 +16,32 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// --- NEW HELPER FUNCTION: Fetches data from Health Canada ---
+async function getDrugInfo(drugName) {
+    try {
+        // Health Canada Drug Product Database API endpoint
+        const url = `https://health-products.canada.ca/api/drug/drugproduct/?brandname=${encodeURIComponent(drugName)}`;
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        
+        const data = await response.json();
+        if (data && data.length > 0) {
+            // Return key info for the first match
+            const drug = data[0];
+            return {
+                brand_name: drug.brand_name,
+                class: drug.class_name,
+                active_ingredients: drug.active_ingredients.map(ing => ing.ingredient_name).join(', ')
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error(`Error fetching drug info for ${drugName}:`, error);
+        return null; // Don't crash if the API fails
+    }
+}
+
+
 exports.handler = async function(event, context) {
     // Check for authenticated user
     if (!context.clientContext || !context.clientContext.user) {
@@ -29,6 +55,7 @@ exports.handler = async function(event, context) {
         // --- Usage tracking logic (no changes here) ---
         const user = context.clientContext.user;
         const userRef = db.collection('users').doc(user.sub);
+        // ... (rest of usage tracking code is the same)
         const doc = await userRef.get();
         if (!doc.exists) {
             await userRef.set({ email: user.email, usage_count: 1, last_used: new Date().toISOString() });
@@ -41,19 +68,42 @@ exports.handler = async function(event, context) {
 
         if (!apiKey) throw new Error("API key is not configured.");
         
+        // --- NEW: Fetch Drug Information ---
+        let drugInfoText = "No specific drug information was queried or found.";
+        const medicationsToQuery = new Set();
+        // A simple way to extract potential drug names from the text fields
+        const allMedsText = `${patientData.drips || ''} ${patientData.medications || ''}`;
+        const potentialDrugs = allMedsText.match(/\b[A-Z][a-z]+(?:-[A-Z][a-z]+)?\b/g) || [];
+        potentialDrugs.forEach(drug => medicationsToQuery.add(drug));
+
+        if (medicationsToQuery.size > 0) {
+            const drugInfoPromises = Array.from(medicationsToQuery).map(getDrugInfo);
+            const drugResults = await Promise.all(drugInfoPromises);
+            const foundDrugs = drugResults.filter(Boolean); // Filter out any null results
+            if (foundDrugs.length > 0) {
+                drugInfoText = "Authoritative data from Health Canada's Drug Product Database:\n" + 
+                               foundDrugs.map(d => `- ${d.brand_name} (Class: ${d.class}, Ingredients: ${d.active_ingredients})`).join('\n');
+            }
+        }
+        // --- END of new drug info logic ---
+
+        
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
-        // --- FINAL, MULTI-PERSONA PROMPT ---
+        // --- UPDATED PROMPT with Drug Info ---
         const prompt = `
-            You are a multi-persona AI assistant for ICU nurses. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "ai_suggestion".
+            You are a multi-persona AI assistant for ICU nurses, grounded by official data. Generate a report as a JSON object with keys "situation", "background", "assessment", "recommendation", and "ai_suggestion".
 
             INSTRUCTION FOR EACH KEY:
-            - "situation", "background", "assessment": Synthesize the data concisely. For "assessment", format it by system (Neurologically:, Cardiovascularly:, etc.).
-            - "recommendation": Act as an experienced ICU Charge Nurse. Provide a practical, actionable to-do list for the next nurse's shift.
-            - "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations and diagnostic thoughts. Structure this by system (Neurological:, Cardiovascular:, etc.). Do NOT state obvious standard-of-care. Conclude with the disclaimer: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
+            - "situation", "background", "assessment": Synthesize the patient data concisely. For "assessment", format it by system (Neurologically:, etc.).
+            - "recommendation": Act as an experienced ICU Charge Nurse. Provide a practical, actionable to-do list.
+            - "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations. Structure this by system (Neurological:, etc.).
+            
+            Use the following authoritative Health Canada data to inform your recommendations and suggestions:
+            ${drugInfoText}
 
-            - Use Canadian medical terminology.
-            - Patient Data: ${JSON.stringify(patientData)}
+            Patient Data Entered by Nurse:
+            ${JSON.stringify(patientData)}
             
             Generate the JSON object now. Ensure the output is only the JSON object itself.
         `;
