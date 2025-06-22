@@ -1,9 +1,7 @@
-# This file tells Netlify where your functions live and their settings.
-# All function settings are grouped under this single [functions] header.
-[functions]
-  directory = "netlify/functions/"
-  timeout = 25
+# This is the simplified configuration file to fix the deployment error.
 
-# This tells Netlify to install the dependencies for your functions.
 [build]
   command = "npm install"
+
+[functions]
+  directory = "netlify/functions/"
