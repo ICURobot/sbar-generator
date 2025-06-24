@@ -2,6 +2,7 @@
 [build]
   command = "npm install"
 
-# This tells Netlify where your functions live.
-[functions]
-  directory = "netlify/functions/"
+# This sets a specific timeout of 30 seconds ONLY for the 'generate-sbar' function.
+# This syntax is more robust and will fix the deployment error.
+[functions."generate-sbar"]
+  timeout = 30
