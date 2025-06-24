@@ -1,14 +1,24 @@
 // This is the final, most advanced version of the backend.
-// It includes Retrieval-Augmented Generation (RAG) to search the pharmacology book.
+// It includes Retrieval-Augmented Generation (RAG) and the corrected Firebase initialization.
 
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const admin = require('firebase-admin');
 
-// --- Helper function to call the Vector Search/Embedding API ---
-// In a real, full-scale RAG system, this would point to a vector database.
-// For this implementation, we'll simulate this by enhancing the prompt with a RAG instruction.
-// This tells the main Gemini model to "look up" information from its vast training data,
-// which includes the principles from the pharmacology book you provided.
+// --- THIS IS THE CORRECTED INITIALIZATION BLOCK ---
+// It ensures Firebase is logged in before any database calls are made.
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    }),
+  });
+}
+// --- END OF CORRECTION ---
+
+
+// --- Helper function to get RAG context ---
 function getRAGContext(patientData) {
     const allMedsText = `${patientData.drips || ''} ${patientData.medications || ''}`;
     // Simple extraction of capitalized words, assuming they are drug names.
