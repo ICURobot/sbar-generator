@@ -6,15 +6,23 @@
     <title>ICU SBAR Report Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- 1. Add the Netlify Identity Widget script -->
+    <!-- Netlify Identity Widget script -->
     <script type="text/javascript" src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+    
+    <!-- UPDATED: Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','YOUR_GTM_ID_HERE');</script>
+    <!-- End Google Tag Manager -->
+    
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
         .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Style for the disabled overlay */
         #form-overlay {
             backdrop-filter: blur(4px);
             -webkit-backdrop-filter: blur(4px);
@@ -22,6 +30,10 @@
     </style>
 </head>
 <body class="p-4 md:p-8">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=YOUR_GTM_ID_HERE"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
 
     <!-- Privacy Disclaimer Modal -->
     <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
@@ -165,7 +177,6 @@
                      <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
                 </section>
 
-                <!-- REMOVED: Checkbox has been removed -->
                 <div class="mt-8 text-center">
                     <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto" disabled>
                         ✨ Generate SBAR Handoff Report
