@@ -1,7 +1,9 @@
-# This is the simplified configuration file to fix the deployment error.
-
+# This tells Netlify to install the dependencies for your functions.
 [build]
   command = "npm install"
 
+# This groups all function settings under one header
+# and increases the timeout to 26 seconds.
 [functions]
   directory = "netlify/functions/"
+  timeout = 26
