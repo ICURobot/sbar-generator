@@ -43,7 +43,7 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        // --- Usage tracking logic (no changes here) ---
+        // --- Usage tracking logic ---
         const user = context.clientContext.user;
         const db = admin.firestore(); // Get Firestore instance
         const userRef = db.collection('users').doc(user.sub);
