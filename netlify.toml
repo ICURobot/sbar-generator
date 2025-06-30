@@ -2,8 +2,11 @@
 [build]
   command = "npm install"
 
-# This groups all function settings under one header
-# and increases the timeout for all functions to 30 seconds.
+# This sets the directory for all serverless functions.
 [functions]
   directory = "netlify/functions/"
+
+# This applies specific settings to ALL functions in the directory.
+# Using the wildcard "*" is a more robust way to set global function configurations.
+[functions."*"]
   timeout = 30
