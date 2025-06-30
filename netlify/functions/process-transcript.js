@@ -18,7 +18,8 @@ exports.handler = async function(event, context) {
 
         if (!apiKey) throw new Error("API key is not configured.");
         
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest?key=${apiKey}`;
+        // --- CORRECTED: Standardized to the reliable gemini-2.0-flash model ---
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         // This prompt instructs the AI to act as a data parser.
         const prompt = `
