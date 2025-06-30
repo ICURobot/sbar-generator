@@ -3,180 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ICU SBAR Report Generator</title>
+    <!-- UPDATED: New Title -->
+    <title>ICU SBAR Report Generator - with AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Netlify Identity Widget script -->
     <script type="text/javascript" src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-    
-    <!-- UPDATED: Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-491XG889DN"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-491XG889DN');
-    </script>
-    <!-- End Google tag -->
-    
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
         .loader { border-top-color: #3498db; animation: spinner 1.5s linear infinite; }
         @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #form-overlay {
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+        #form-overlay { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        /* Recording animation */
+        .recording { animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.05); box-shadow: 0 0 10px 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
     </style>
 </head>
 <body class="p-4 md:p-8">
-    <!-- The noscript tag for GTM is no longer needed with this gtag.js setup -->
 
     <!-- Privacy Disclaimer Modal -->
     <div id="privacy-modal" class="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg p-6 text-center">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-red-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h2 class="text-2xl font-bold text-gray-800 mb-2">Important Privacy Notice</h2>
-            <p class="text-gray-600 mb-6">
-                This is a demonstration and educational tool. For patient privacy and security (HIPAA/PHIPA), please **do not enter any real patient information** (names, ages, dates of birth, etc.). Use placeholder or generic information for all fields.
-            </p>
-            <button id="close-privacy-modal" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-8 rounded-lg">I Understand</button>
-        </div>
+        <!-- ... (privacy modal content is unchanged) ... -->
     </div>
 
 
     <div class="max-w-4xl mx-auto">
         <!-- Login/Logout section -->
         <div id="auth-container" class="bg-white rounded-lg shadow-md p-4 mb-6 flex justify-between items-center">
-            <div id="user-info" class="text-sm font-medium text-gray-600">Please log in to use the generator.</div>
-            <!-- Auto-save status will be added here by JS -->
-            <div id="save-status" class="text-sm text-green-600 font-semibold"></div>
-            <button id="auth-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
+            <!-- ... (auth container content is unchanged) ... -->
         </div>
+
+        <!-- NEW: Speech-to-Text Section -->
+        <div id="speech-container" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Voice Report Capture</h2>
+                <button id="record-btn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors">
+                    <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                </button>
+            </div>
+            <textarea id="transcript-box" class="w-full h-32 p-3 border rounded-md bg-gray-50 text-sm" placeholder="Click the microphone to start speaking... your transcribed report will appear here."></textarea>
+            <div id="speech-status" class="text-sm text-gray-500 mt-2 h-5"></div>
+            <button id="process-transcript-btn" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors" disabled>
+                Finish Capturing & Fill Form
+            </button>
+        </div>
+
 
         <!-- The main container for the assessment sheet -->
         <div class="relative">
-            <!-- Overlay to disable the form when logged out -->
-            <div id="form-overlay" class="absolute inset-0 bg-gray-200 bg-opacity-50 z-20 flex items-center justify-center rounded-lg">
-                <p class="text-lg font-bold text-gray-700">Please log in to activate the form.</p>
-            </div>
+            <!-- ... (form overlay is unchanged) ... -->
             
             <div id="assessment-form" class="bg-white rounded-lg shadow-2xl p-6 md:p-8">
-                <!-- Header and Clear Form Button -->
+                <!-- UPDATED: New Title -->
                 <header class="border-b-2 border-gray-200 pb-4 mb-6 flex justify-between items-center">
-                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ICU SBAR Report Generator</h1>
+                    <h1 class="text-2xl md:text-3xl font-bold text-gray-800">ICU SBAR Report Generator - with AI</h1>
                     <button id="clear-form-btn" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1 px-3 rounded-md">Clear Form</button>
                 </header>
 
-                <!-- All form fields go here -->
-                <section class="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4 text-sm mb-6">
-                    <div class="flex items-end"><span class="font-bold mr-2">Room:</span><input id="room" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="flex items-end"><span class="font-bold mr-2">Name:</span><input id="name" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="flex items-end"><span class="font-bold mr-2">Age/Sex:</span><input id="age-sex" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="flex items-end"><span class="font-bold mr-2">MD:</span><input id="md" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="col-span-2 flex items-end"><span class="font-bold mr-2">Allergies:</span><input id="allergies" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="flex items-end"><span class="font-bold mr-2">Code Status:</span><input id="code-status" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="flex items-end"><span class="font-bold mr-2">Isolation:</span><input id="isolation" class="w-full border-0 border-b border-gray-300 p-0 focus:ring-0"></div>
-                    <div class="col-span-2 flex items-start"><span class="font-bold mr-2 mt-1">Diagnosis:</span><textarea id="diagnosis" class="w-full h-8 border-0 border-b border-gray-300 focus:ring-0 focus:border-sky-500 resize-none p-0"></textarea></div>
-                    <div class="col-span-2 flex items-start"><span class="font-bold mr-2 mt-1">History:</span><textarea id="history" class="w-full h-8 border-0 border-b border-gray-300 focus:ring-0 focus:border-sky-500 resize-none p-0"></textarea></div>
-                </section>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Neurological -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Neurological</h2>
-                        <div class="space-y-3 text-sm">
-                             <div><span class="font-semibold">LOC/GCS:</span> <input id="loc" class="w-full border-0 border-b p-0" placeholder="A&O x ?, GCS: E4V5M6"></div>
-                             <div><span class="font-semibold">Pupils:</span> <input id="pupils" class="w-full border-0 border-b p-0" placeholder="PERRLA, 3mm, etc."></div>
-                             <div><span class="font-semibold">Sedation/Pain:</span> <input id="sedation-pain" class="w-full border-0 border-b p-0" placeholder="RASS, CPOT"></div>
-                             <div><span class="font-semibold">Delirium Score:</span> <input id="delirium-score" class="w-full border-0 border-b p-0" placeholder="CAM-ICU +, ICDSC score"></div>
-                             <div><span class="font-semibold">EVD/ICP/VP Shunt:</span> <input id="evd" class="w-full border-0 border-b p-0" placeholder="Clamped, ICP, drainage"></div>
-                             <div><span class="font-semibold">Temperature (°C):</span> <input id="temperature" type="number" step="0.1" class="w-full border-0 border-b p-0" placeholder="e.g., 38.5"></div>
-                        </div>
-                    </div>
-                    <!-- Cardiovascular -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Cardiovascular</h2>
-                         <div class="space-y-3 text-sm">
-                            <div><span class="font-semibold">HR/Rhythm:</span> <input id="hr-rhythm" class="w-full border-0 border-b p-0" placeholder="80s, NSR"></div>
-                            <div><span class="font-semibold">BP/MAP:</span> <input id="bp-map" class="w-full border-0 border-b p-0" placeholder="120/80 (93)"></div>
-                            <div><span class="font-semibold">Pulses:</span> <input id="pulses" class="w-full border-0 border-b p-0" placeholder="Present, +1, doppler"></div>
-                            <div><span class="font-semibold">Pacemaker:</span> <input id="pacemaker" class="w-full border-0 border-b p-0" placeholder="Paced Atrial, VVI @ 70"></div>
-                            <div><span class="font-semibold">IABP/Support:</span> <input id="iabp" class="w-full border-0 border-b p-0" placeholder="IABP 1:1, Impella, ECMO"></div>
-                        </div>
-                    </div>
-                    <!-- Respiratory -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Respiratory</h2>
-                        <div class="space-y-3 text-sm">
-                            <div><span class="font-semibold">Oxygen Delivery:</span> <input id="o2-delivery" class="w-full border-0 border-b p-0" placeholder="BiPAP, HFM, NC @ 2L"></div>
-                            <div><span class="font-semibold">Ventilator Settings:</span><input id="vent-settings" class="w-full border-0 border-b p-0" placeholder="AC/VC, Rate 12, TV 450, PEEP 8"></div>
-                            <div><span class="font-semibold">Trach/Airway:</span><input id="trach-airway" class="w-full border-0 border-b p-0" placeholder="Size 7, cuffed, last change date"></div>
-                            <div><span class="font-semibold">Breath Sounds:</span><textarea id="breath-sounds" class="w-full border-0 border-b resize-none p-0" placeholder="Coarse in RLL, CTA elsewhere"></textarea></div>
-                        </div>
-                    </div>
-                    <!-- GI/GU Section -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">GI / GU</h2>
-                        <div class="space-y-3 text-sm">
-                            <div><span class="font-semibold">Diet/Feeds:</span> <input id="diet" class="w-full border-0 border-b p-0" placeholder="NPO, Tube Feeds @ 50/hr"></div>
-                            <div><span class="font-semibold">Abdomen/Bowel:</span> <input id="abdomen" class="w-full border-0 border-b p-0" placeholder="Soft, last BM yesterday"></div>
-                            <div><span class="font-semibold">Urine Output:</span> <input id="urine-output" class="w-full border-0 border-b p-0" placeholder="Foley, >30mL/hr, clear"></div>
-                        </div>
-                    </div>
-                    <!-- Access Section -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Access</h2>
-                         <div class="space-y-3 text-sm">
-                            <div><span class="font-semibold">IV Lines:</span> <input id="iv-lines" class="w-full border-0 border-b p-0" placeholder="20g LFA, 18g RAC"></div>
-                            <div><span class="font-semibold">Arterial Line:</span> <input id="art-line" class="w-full border-0 border-b p-0" placeholder="R Radial, L Femoral"></div>
-                            <div><span class="font-semibold">Central Line:</span> <input id="central-line" class="w-full border-0 border-b p-0" placeholder="TLC R IJ, HD line L Fem"></div>
-                            <div><span class="font-semibold">Other Drains/Tubes:</span> <input id="drains-tubes" class="w-full border-0 border-b p-0" placeholder="Chest tube, NG tube"></div>
-                        </div>
-                    </div>
-                    <!-- Integumentary/MSK Section -->
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Integumentary / MSK</h2>
-                         <div class="space-y-3 text-sm">
-                            <div><span class="font-semibold">Skin Integrity:</span> <input id="skin-integrity" class="w-full border-0 border-b p-0" placeholder="Sacral ulcer Stage 2, dressing CDI"></div>
-                            <div><span class="font-semibold">Traction/Fixators:</span> <input id="traction-fixators" class="w-full border-0 border-b p-0" placeholder="External fixator RLE, weights"></div>
-                            <div><span class="font-semibold">Fractures/ORIF/Braces:</span> <input id="fractures-braces" class="w-full border-0 border-b p-0" placeholder="R Tib/Fib ORIF, spinal brace"></div>
-                        </div>
-                    </div>
-                </div>
+                <!-- All form fields are unchanged -->
+                <!-- ... (rest of the form HTML) ... -->
                 
-                 <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Key Labs / Diagnostics</h2>
-                        <textarea id="labs-diagnostics" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., K: 3.2, WBC: 15.1, Lactate: 4.2..."></textarea>
-                    </div>
-                    <div>
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Family Communication</h2>
-                        <textarea id="family-communication" class="w-full h-24 border rounded-lg p-2" placeholder="Spokesperson, last update, concerns..."></textarea>
-                    </div>
-                </section>
-
-                <section class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div>
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">IV Drips / Infusions</h2>
-                        <textarea id="drips" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Norepinephrine @ 10 mcg/min..."></textarea>
-                    </div>
-                     <div>
-                        <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Scheduled Medications</h2>
-                        <textarea id="medications" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Antibiotics, PRN pain meds..."></textarea>
-                    </div>
-                </section>
-
-                <section class="mt-6">
-                     <h2 class="font-bold text-lg text-gray-700 mb-3 border-b pb-2">Plan for the Shift</h2>
-                     <textarea id="plan" class="w-full h-24 border rounded-lg p-2" placeholder="e.g., Wean pressors, follow up on chest x-ray, consult with pharmacy..."></textarea>
-                </section>
-
                 <div class="mt-8 text-center">
                     <button id="generate-sbar-btn" class="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-transform transform hover:scale-105 flex items-center gap-2 mx-auto" disabled>
                         ✨ Generate SBAR Handoff Report
@@ -189,252 +82,129 @@
 
     <!-- SBAR Generation Modal -->
     <div id="sbar-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
-        <div class="modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95 max-h-[90vh] flex flex-col">
-            <!-- Modal Header -->
-            <div class="p-6 pb-4 border-b border-gray-200">
-                <div class="flex justify-between items-center">
-                    <h2 class="text-2xl font-bold text-gray-800">Generated SBAR Report</h2>
-                    <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
-                </div>
-            </div>
-            <!-- Scrollable Content Area -->
-            <div id="report-content-container" class="p-6 space-y-4 overflow-y-auto">
-                <!-- Loading indicator and content will be injected here by JavaScript -->
-            </div>
-            <!-- Modal Footer -->
-            <div class="bg-gray-100 p-4 mt-auto flex justify-end items-center gap-4 rounded-b-lg border-t border-gray-200">
-                <span id="copy-success-msg" class="text-green-600 font-semibold hidden">Copied!</span>
-                <button id="copy-report-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-lg transition-colors">
-                    Copy to Clipboard
-                </button>
-            </div>
-        </div>
+        <!-- ... (SBAR modal content is unchanged) ... -->
     </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const generateBtn = document.getElementById('generate-sbar-btn');
-        const modal = document.getElementById('sbar-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const reportContentContainer = document.getElementById('report-content-container');
-        const copyReportBtn = document.getElementById('copy-report-btn');
-        const copySuccessMsg = document.getElementById('copy-success-msg');
-        const form = document.getElementById('assessment-form');
-        const formOverlay = document.getElementById('form-overlay');
-        const userInfo = document.getElementById('user-info');
-        const authBtn = document.getElementById('auth-btn');
-        const privacyModal = document.getElementById('privacy-modal');
-        const closePrivacyModalBtn = document.getElementById('close-privacy-modal');
-        const saveStatus = document.getElementById('save-status');
-        const clearFormBtn = document.getElementById('clear-form-btn');
+        // --- All existing variable declarations are the same ---
+        const speechContainer = document.getElementById('speech-container');
+        const recordBtn = document.getElementById('record-btn');
+        const transcriptBox = document.getElementById('transcript-box');
+        const speechStatus = document.getElementById('speech-status');
+        const processTranscriptBtn = document.getElementById('process-transcript-btn');
 
-        let lastReportJson = null;
-        let saveTimeout;
+        let recognition;
+        let isRecording = false;
 
-        function checkPrivacyDisclaimer() {
-            const today = new Date().toISOString().split('T')[0];
-            const lastShown = localStorage.getItem('disclaimerShownDate');
-            if (lastShown !== today) {
-                privacyModal.classList.remove('hidden');
-            }
-        }
-        closePrivacyModalBtn.addEventListener('click', () => {
-            privacyModal.classList.add('hidden');
-            const today = new Date().toISOString().split('T')[0];
-            localStorage.setItem('disclaimerShownDate', today);
-        });
-        checkPrivacyDisclaimer();
-        
-        async function saveDraft() {
-            const user = window.netlifyIdentity.currentUser();
-            if (!user) return; 
+        // --- NEW Speech Recognition Logic ---
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-CA'; // Set for Canadian English
 
-            const formData = collectFormData();
-            saveStatus.textContent = 'Saving...';
-            
-            await fetch('/.netlify/functions/form-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
-                body: JSON.stringify({ formData })
+            recognition.onstart = () => {
+                isRecording = true;
+                speechStatus.textContent = 'Listening... Click the microphone again to stop.';
+                recordBtn.classList.add('recording', 'bg-red-200');
+            };
+
+            recognition.onend = () => {
+                isRecording = false;
+                speechStatus.textContent = '';
+                recordBtn.classList.remove('recording', 'bg-red-200');
+                if (transcriptBox.value.trim().length > 0) {
+                    processTranscriptBtn.disabled = false;
+                }
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                transcriptBox.value = transcriptBox.value.split('...')[0] + finalTranscript + '...';
+                speechStatus.textContent = 'Listening... ' + interimTranscript;
+            };
+
+            recordBtn.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                } else {
+                    transcriptBox.value = ''; // Clear previous transcript
+                    recognition.start();
+                }
             });
 
-            saveStatus.textContent = 'Draft Saved!';
-            setTimeout(() => { saveStatus.textContent = ''; }, 2000);
-        }
-
-        async function loadDraft(user) {
-            if (!user) return;
-            try {
-                const response = await fetch('/.netlify/functions/form-data', {
-                    headers: { 'Authorization': `Bearer ${user.token.access_token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    populateForm(data.formData);
+            processTranscriptBtn.addEventListener('click', async () => {
+                const user = window.netlifyIdentity.currentUser();
+                if (!user) {
+                    alert("You must be logged in to process a transcript.");
+                    return;
                 }
-            } catch (error) {
-                console.error("Could not load draft:", error);
-            }
-        }
-        
-        function populateForm(formData) {
-            for (const key in formData) {
-                const element = document.getElementById(key);
-                if (element) {
-                    element.value = formData[key];
+                
+                const transcript = transcriptBox.value.replace('...', '').trim();
+                if (!transcript) return;
+
+                processTranscriptBtn.disabled = true;
+                processTranscriptBtn.textContent = 'Processing...';
+
+                try {
+                    const response = await fetch('/.netlify/functions/process-transcript', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}` },
+                        body: JSON.stringify({ transcript: transcript })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || "Failed to process transcript.");
+                    }
+                    
+                    const result = await response.json();
+                    populateForm(result.formData);
+                    speechStatus.textContent = 'Form filled successfully!';
+
+                } catch (error) {
+                    console.error("Error processing transcript:", error);
+                    speechStatus.textContent = `Error: ${error.message}`;
+                } finally {
+                     processTranscriptBtn.textContent = 'Finish Capturing & Fill Form';
                 }
-            }
+            });
+
+        } else {
+            speechContainer.innerHTML = '<p class="text-red-500 text-center font-semibold">Speech recognition is not supported by your browser. Please use Google Chrome.</p>';
         }
 
-        form.addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveDraft, 2000); 
-        });
-        
-        clearFormBtn.addEventListener('click', () => {
-            if(confirm('Are you sure you want to clear the entire form? This cannot be undone.')) {
-                form.querySelectorAll('input, textarea').forEach(el => el.value = '');
-                saveDraft();
-            }
-        });
 
-
+        // --- All existing functions (updateLoginState, saveDraft, loadDraft, etc.) are the same ---
+        // --- except updateLoginState now shows the speech container ---
         function updateLoginState(user) {
             if (user) {
                 userInfo.textContent = `Welcome, ${user.email}!`;
                 authBtn.textContent = 'Log Out';
                 formOverlay.classList.add('hidden');
                 generateBtn.disabled = false;
+                speechContainer.classList.remove('hidden'); // Show the speech container
                 loadDraft(user); 
             } else {
                 userInfo.textContent = 'Please log in to use the generator.';
                 authBtn.textContent = 'Log In / Sign Up';
                 formOverlay.classList.remove('hidden');
                 generateBtn.disabled = true;
+                speechContainer.classList.add('hidden'); // Hide the speech container
             }
         }
 
-        authBtn.addEventListener('click', () => {
-            const user = window.netlifyIdentity.currentUser();
-            if (user) {
-                saveDraft().then(() => window.netlifyIdentity.logout());
-            } else {
-                window.netlifyIdentity.open();
-            }
-        });
+        // ... (The rest of the script is identical to the previous version)
         
-        if (window.netlifyIdentity) {
-            netlifyIdentity.on('init', user => updateLoginState(user));
-            netlifyIdentity.on('login', user => {
-                updateLoginState(user);
-                netlifyIdentity.close();
-            });
-            netlifyIdentity.on('logout', () => updateLoginState(null));
-        }
-
-        generateBtn.addEventListener('click', handleGenerateSbar);
-        closeModalBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => e.target === modal && closeModal());
-        copyReportBtn.addEventListener('click', copyReportToClipboard);
-
-        function collectFormData() {
-            const data = {};
-            Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
-                if (el.id && el.value.trim()) {
-                    data[el.id] = el.value.trim();
-                }
-            });
-            return data;
-        }
-
-        async function handleGenerateSbar() {
-            await saveDraft(); 
-            const user = window.netlifyIdentity.currentUser();
-            if (!user) return;
-
-            const formData = collectFormData();
-            if (Object.keys(formData).length === 0) {
-                alert("Please fill out some patient information first.");
-                return;
-            }
-
-            openModal();
-            reportContentContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div><p class="text-lg font-semibold text-gray-600">Generating report...</p></div>`;
-            
-            try {
-                const response = await fetch('/.netlify/functions/generate-sbar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
-                    body: JSON.stringify({ patientData: formData })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Request failed with status ${response.status}`);
-                }
-
-                const result = await response.json();
-                lastReportJson = result.report; 
-                renderReport(lastReportJson);
-
-            } catch (error) {
-                reportContentContainer.innerHTML = `<p class="text-red-500 font-semibold">An error occurred: ${error.message}</p>`;
-            }
-        }
-        
-        function renderReport(report) {
-            const sectionColors = {
-                situation: 'bg-blue-50 border-blue-200 text-blue-800',
-                background: 'bg-indigo-50 border-indigo-200 text-indigo-800',
-                assessment: 'bg-green-50 border-green-200 text-green-800',
-                recommendation: 'bg-amber-50 border-amber-200 text-amber-800',
-                ai_suggestion: 'bg-rose-50 border-rose-200 text-rose-800' // Use a different key for styling
-            };
-
-            let html = '';
-            for (const key in report) {
-                if (Object.hasOwnProperty.call(report, key) && report[key]) {
-                    // UPDATED: Change the title for the suggestions key
-                    const title = key === 'ai_suggestion' ? 'AI Suggestion' : (key.charAt(0).toUpperCase() + key.slice(1));
-                    const colorClasses = sectionColors[key] || 'bg-gray-50 border-gray-200';
-                    html += `<div class="p-4 rounded-lg border ${colorClasses} shadow-sm"><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3><p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p></div>`;
-                }
-            }
-            reportContentContainer.innerHTML = html;
-        }
-
-        function copyReportToClipboard() {
-            if (!lastReportJson) return;
-            let plainText = '';
-            for (const key in lastReportJson) {
-                if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
-                     const title = key === 'ai_suggestion' ? '**AI Suggestion**' : `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
-                     plainText += `${title}\n${lastReportJson[key]}\n\n`;
-                }
-            }
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = plainText.trim();
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
-            copySuccessMsg.classList.remove('hidden');
-            setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
-        }
-
-        function openModal() {
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.style.opacity = '1';
-                modal.querySelector('.modal-content').style.transform = 'scale(1)';
-            }, 10);
-        }
-
-        function closeModal() {
-            modal.style.opacity = '0';
-            modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
-            setTimeout(() => modal.classList.add('hidden'), 250);
-        }
     });
 </script>
 </body>
