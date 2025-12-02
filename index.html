@@ -59,20 +59,68 @@
             <button id="auth-btn" class="bg-sky-600 hover:bg-sky-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm">Log In / Sign Up</button>
         </div>
 
-        <!-- Speech-to-Text Section -->
-        <div id="speech-container" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
-            <div class="flex items-center justify-between mb-4">
-                <h2 class="text-xl font-bold text-gray-800">Voice Report Capture</h2>
-                <button id="record-btn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors">
-                    <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                    </svg>
+        <!-- Multi-Modal Report Capture Section -->
+        <div id="report-capture-container" class="bg-white rounded-lg shadow-md p-6 mb-6 hidden">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Report Capture</h2>
+            
+            <!-- Input Type Tabs -->
+            <div class="flex gap-2 mb-4 border-b border-gray-200">
+                <button id="tab-voice" class="tab-btn px-4 py-2 font-semibold text-sm border-b-2 border-blue-500 text-blue-600" data-tab="voice">
+                    🎤 Voice
+                </button>
+                <button id="tab-text" class="tab-btn px-4 py-2 font-semibold text-sm text-gray-600 hover:text-gray-800" data-tab="text">
+                    📝 Text
+                </button>
+                <button id="tab-image" class="tab-btn px-4 py-2 font-semibold text-sm text-gray-600 hover:text-gray-800" data-tab="image">
+                    📷 Image
                 </button>
             </div>
-            <textarea id="transcript-box" class="w-full h-32 p-3 border rounded-md bg-gray-50 text-sm" placeholder="Click the microphone to start speaking... your transcribed report will appear here."></textarea>
-            <div id="speech-status" class="text-sm text-gray-500 mt-2 h-5"></div>
-            <button id="process-transcript-btn" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-colors" disabled>
-                Finish Capturing & Fill Form
+
+            <!-- Voice Input Tab -->
+            <div id="panel-voice" class="tab-panel">
+                <div class="flex items-center justify-between mb-4">
+                    <p class="text-sm text-gray-600">Record your voice report or paste a transcript</p>
+                    <button id="record-btn" class="p-3 bg-gray-200 hover:bg-gray-300 rounded-full transition-colors">
+                        <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                        </svg>
+                    </button>
+                </div>
+                <textarea id="transcript-box" class="w-full h-32 p-3 border rounded-md bg-gray-50 text-sm" placeholder="Click the microphone to start speaking, or type/paste your report here..."></textarea>
+            </div>
+
+            <!-- Text Input Tab -->
+            <div id="panel-text" class="tab-panel hidden">
+                <p class="text-sm text-gray-600 mb-3">Type or paste your free-text report below. AI will extract structured data.</p>
+                <textarea id="text-input-box" class="w-full h-40 p-3 border rounded-md bg-gray-50 text-sm" placeholder="Enter your report in free text format... e.g., 'Patient in room 101, John Doe, 65M, diagnosis: Sepsis, BP 120/80, HR 85...'"></textarea>
+            </div>
+
+            <!-- Image Input Tab -->
+            <div id="panel-image" class="tab-panel hidden">
+                <p class="text-sm text-gray-600 mb-3">Upload or capture an image of a patient report, whiteboard, or notes. AI will extract data using vision.</p>
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <input type="file" id="image-input" accept="image/*" capture="environment" class="hidden">
+                    <div id="image-preview-container" class="hidden mb-4">
+                        <img id="image-preview" src="" alt="Preview" class="max-w-full max-h-64 mx-auto rounded-lg shadow-md">
+                        <button id="remove-image-btn" class="mt-2 text-red-600 hover:text-red-800 text-sm">Remove Image</button>
+                    </div>
+                    <button id="select-image-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                        📷 Select or Capture Image
+                    </button>
+                    <p class="text-xs text-gray-500 mt-2">Supports: JPG, PNG, WebP</p>
+                </div>
+            </div>
+
+            <!-- Status and Process Button -->
+            <div id="capture-status" class="text-sm text-gray-500 mt-4 h-5"></div>
+            <button id="process-report-btn" class="mt-4 w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2" disabled>
+                <span id="process-btn-text">✨ Process & Fill Form</span>
+                <span id="process-loading" class="hidden">
+                    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
             </button>
         </div>
 
@@ -228,300 +276,57 @@
         </div>
     </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // All variable declarations
-        const generateBtn = document.getElementById('generate-sbar-btn');
-        const modal = document.getElementById('sbar-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const reportContentContainer = document.getElementById('report-content-container');
-        const copyReportBtn = document.getElementById('copy-report-btn');
-        const copySuccessMsg = document.getElementById('copy-success-msg');
-        const form = document.getElementById('assessment-form');
-        const formOverlay = document.getElementById('form-overlay');
-        const userInfo = document.getElementById('user-info');
-        const authBtn = document.getElementById('auth-btn');
-        const privacyModal = document.getElementById('privacy-modal');
-        const closePrivacyModalBtn = document.getElementById('close-privacy-modal');
-        const saveStatus = document.getElementById('save-status');
-        const clearFormBtn = document.getElementById('clear-form-btn');
-        const speechContainer = document.getElementById('speech-container');
-        const recordBtn = document.getElementById('record-btn');
-        const transcriptBox = document.getElementById('transcript-box');
-        const speechStatus = document.getElementById('speech-status');
-        const processTranscriptBtn = document.getElementById('process-transcript-btn');
+    <!-- Chat Assistant Floating Button -->
+    <button id="chat-assistant-btn" class="fixed bottom-6 right-6 bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-4 px-4 rounded-full shadow-2xl transition-transform transform hover:scale-110 z-40 flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+    </button>
 
-        let lastReportJson = null;
-        let saveTimeout;
-        let recognition;
-        let isRecording = false;
+    <!-- Chat Assistant Modal -->
+    <div id="chat-modal" class="modal fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 hidden opacity-0">
+        <div class="chat-modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl transform scale-95 max-h-[90vh] flex flex-col">
+            <!-- Modal Header -->
+            <div class="p-6 pb-4 border-b border-gray-200 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-t-lg">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-2xl font-bold">ICU Knowledge Assistant</h2>
+                    <button id="close-chat-btn" class="text-white hover:text-gray-200 text-3xl leading-none">&times;</button>
+                </div>
+                <p class="text-sm mt-2 text-purple-100">Ask questions about ICU protocols, medications, or patient care</p>
+            </div>
+            <!-- Chat Messages Area -->
+            <div id="chat-messages" class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50">
+                <div class="text-center text-gray-500 text-sm">
+                    <p>👋 Ask me anything about ICU care, medications, or protocols!</p>
+                    <p class="mt-2 text-xs">Example: "What is the dose for Levo?" or "Sepsis protocol guidelines"</p>
+                </div>
+            </div>
+            <!-- Chat Input Area -->
+            <div class="p-4 border-t border-gray-200 bg-white rounded-b-lg">
+                <div class="flex gap-2">
+                    <input 
+                        id="chat-input" 
+                        type="text" 
+                        placeholder="Type your question..." 
+                        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <button 
+                        id="chat-send-btn" 
+                        class="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-2 px-6 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                        <span id="chat-loading" class="hidden">
+                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Privacy Modal Logic
-        function checkPrivacyDisclaimer() {
-            const today = new Date().toISOString().split('T')[0];
-            const lastShown = localStorage.getItem('disclaimerShownDate');
-            if (lastShown !== today) {
-                privacyModal.classList.remove('hidden');
-            }
-        }
-        closePrivacyModalBtn.addEventListener('click', () => {
-            privacyModal.classList.add('hidden');
-            const today = new Date().toISOString().split('T')[0];
-            localStorage.setItem('disclaimerShownDate', today);
-        });
-        checkPrivacyDisclaimer();
-        
-        // Auto-Save and Load Logic
-        async function saveDraft() {
-            const user = window.netlifyIdentity.currentUser();
-            if (!user) return; 
-            const formData = collectFormData();
-            saveStatus.textContent = 'Saving...';
-            await fetch('/.netlify/functions/form-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
-                body: JSON.stringify({ formData })
-            });
-            saveStatus.textContent = 'Draft Saved!';
-            setTimeout(() => { saveStatus.textContent = ''; }, 2000);
-        }
-
-        async function loadDraft(user) {
-            if (!user) return;
-            try {
-                const response = await fetch('/.netlify/functions/form-data', {
-                    headers: { 'Authorization': `Bearer ${user.token.access_token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    populateForm(data.formData);
-                }
-            } catch (error) { console.error("Could not load draft:", error); }
-        }
-        
-        function populateForm(formData) {
-            for (const key in formData) {
-                const element = document.getElementById(key);
-                if (element) { element.value = formData[key]; }
-            }
-        }
-
-        form.addEventListener('input', () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveDraft, 2000); 
-        });
-        
-        clearFormBtn.addEventListener('click', () => {
-            if(confirm('Are you sure you want to clear the entire form? This cannot be undone.')) {
-                form.querySelectorAll('input, textarea').forEach(el => el.value = '');
-                saveDraft();
-            }
-        });
-
-        // Authentication Logic
-        function updateLoginState(user) {
-            if (user) {
-                userInfo.textContent = `Welcome, ${user.email}!`;
-                authBtn.textContent = 'Log Out';
-                formOverlay.classList.add('hidden');
-                generateBtn.disabled = false;
-                speechContainer.classList.remove('hidden');
-                loadDraft(user); 
-            } else {
-                userInfo.textContent = 'Please log in to use the generator.';
-                authBtn.textContent = 'Log In / Sign Up';
-                formOverlay.classList.remove('hidden');
-                generateBtn.disabled = true;
-                speechContainer.classList.add('hidden');
-            }
-        }
-
-        authBtn.addEventListener('click', () => {
-            const user = window.netlifyIdentity.currentUser();
-            if (user) {
-                saveDraft().then(() => window.netlifyIdentity.logout());
-            } else {
-                window.netlifyIdentity.open();
-            }
-        });
-        
-        if (window.netlifyIdentity) {
-            netlifyIdentity.on('init', user => updateLoginState(user));
-            netlifyIdentity.on('login', user => {
-                updateLoginState(user);
-                netlifyIdentity.close();
-            });
-            netlifyIdentity.on('logout', () => updateLoginState(null));
-        }
-
-        // Speech Recognition Logic
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = 'en-CA'; 
-
-            recognition.onstart = () => {
-                isRecording = true;
-                speechStatus.textContent = 'Listening... Click the microphone again to stop.';
-                recordBtn.classList.add('recording', 'bg-red-200');
-            };
-
-            recognition.onend = () => {
-                isRecording = false;
-                speechStatus.textContent = '';
-                recordBtn.classList.remove('recording', 'bg-red-200');
-                if (transcriptBox.value.trim().length > 0) {
-                    processTranscriptBtn.disabled = false;
-                }
-            };
-
-            recognition.onresult = (event) => {
-                let finalTranscript = transcriptBox.value.split('...')[0]; // Keep existing final text
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalTranscript += event.results[i][0].transcript;
-                    }
-                }
-                transcriptBox.value = finalTranscript;
-            };
-
-            recordBtn.addEventListener('click', () => {
-                if (isRecording) {
-                    recognition.stop();
-                } else {
-                    transcriptBox.value = ''; 
-                    recognition.start();
-                }
-            });
-
-            processTranscriptBtn.addEventListener('click', async () => {
-                const user = window.netlifyIdentity.currentUser();
-                if (!user) return;
-                const transcript = transcriptBox.value.trim();
-                if (!transcript) return;
-
-                processTranscriptBtn.disabled = true;
-                processTranscriptBtn.textContent = 'Processing...';
-
-                try {
-                    const response = await fetch('/.netlify/functions/process-transcript', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}` },
-                        body: JSON.stringify({ transcript: transcript })
-                    });
-                    if (!response.ok) throw new Error("Failed to process transcript.");
-                    const result = await response.json();
-                    populateForm(result.formData);
-                    speechStatus.textContent = 'Form filled successfully!';
-                } catch (error) {
-                    console.error("Error processing transcript:", error);
-                    speechStatus.textContent = `Error: ${error.message}`;
-                } finally {
-                     processTranscriptBtn.textContent = 'Finish Capturing & Fill Form';
-                }
-            });
-        } else {
-            speechContainer.innerHTML = '<p class="text-red-500 text-center font-semibold">Speech recognition is not supported by your browser. Please use Google Chrome.</p>';
-        }
-
-        // SBAR Generation and Modal Logic
-        generateBtn.addEventListener('click', handleGenerateSbar);
-        closeModalBtn.addEventListener('click', closeModal);
-        modal.addEventListener('click', (e) => e.target === modal && closeModal());
-        copyReportBtn.addEventListener('click', copyReportToClipboard);
-
-        function collectFormData() {
-            const data = {};
-            Array.from(form.querySelectorAll('input, textarea')).forEach(el => {
-                if (el.id && el.value.trim()) {
-                    data[el.id] = el.value.trim();
-                }
-            });
-            return data;
-        }
-
-        async function handleGenerateSbar() {
-            await saveDraft(); 
-            const user = window.netlifyIdentity.currentUser();
-            if (!user) return;
-            const formData = collectFormData();
-            if (Object.keys(formData).length === 0) {
-                alert("Please fill out some patient information first.");
-                return;
-            }
-
-            openModal();
-            reportContentContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div><p class="text-lg font-semibold text-gray-600">Generating report...</p></div>`;
-            
-            try {
-                const response = await fetch('/.netlify/functions/generate-sbar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token.access_token}`},
-                    body: JSON.stringify({ patientData: formData })
-                });
-                if (!response.ok) throw new Error((await response.json()).error || "Request failed");
-                const result = await response.json();
-                lastReportJson = result.report; 
-                renderReport(lastReportJson);
-            } catch (error) {
-                reportContentContainer.innerHTML = `<p class="text-red-500 font-semibold">An error occurred: ${error.message}</p>`;
-            }
-        }
-        
-        function renderReport(report) {
-            const sectionColors = {
-                situation: 'bg-blue-50 border-blue-200 text-blue-800',
-                background: 'bg-indigo-50 border-indigo-200 text-indigo-800',
-                assessment: 'bg-green-50 border-green-200 text-green-800',
-                recommendation: 'bg-amber-50 border-amber-200 text-amber-800',
-                ai_suggestion: 'bg-rose-50 border-rose-200 text-rose-800'
-            };
-
-            let html = '';
-            for (const key in report) {
-                if (Object.hasOwnProperty.call(report, key) && report[key]) {
-                    const title = key === 'ai_suggestion' ? 'AI Suggestion' : (key.charAt(0).toUpperCase() + key.slice(1));
-                    const colorClasses = sectionColors[key] || 'bg-gray-50 border-gray-200';
-                    html += `<div class="p-4 rounded-lg border ${colorClasses} shadow-sm"><h3 class="text-lg font-bold text-gray-900 mb-2">${title}</h3><p class="text-gray-700 whitespace-pre-wrap">${report[key]}</p></div>`;
-                }
-            }
-            reportContentContainer.innerHTML = html;
-        }
-
-        function copyReportToClipboard() {
-            if (!lastReportJson) return;
-            let plainText = '';
-            for (const key in lastReportJson) {
-                if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
-                     const title = key === 'ai_suggestion' ? '**AI Suggestion**' : `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
-                     plainText += `${title}\n${lastReportJson[key]}\n\n`;
-                }
-            }
-            const tempTextArea = document.createElement('textarea');
-            tempTextArea.value = plainText.trim();
-            document.body.appendChild(tempTextArea);
-            tempTextArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(tempTextArea);
-            copySuccessMsg.classList.remove('hidden');
-            setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
-        }
-
-        function openModal() {
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                modal.style.opacity = '1';
-                modal.querySelector('.modal-content').style.transform = 'scale(1)';
-            }, 10);
-        }
-
-        function closeModal() {
-            modal.style.opacity = '0';
-            modal.querySelector('.modal-content').style.transform = 'scale(0.95)';
-            setTimeout(() => modal.classList.add('hidden'), 250);
-        }
-    });
-</script>
+<script src="script.js"></script>
 </body>
 </html>
