@@ -1,9 +1,10 @@
 {
-  "rewrites": [
-    { "source": "/chat", "destination": "/api/index" },
-    { "source": "/generate_sbar", "destination": "/api/index" },
-    { "source": "/process_report", "destination": "/api/index" },
-    { "source": "/docs", "destination": "/api/index" },
-    { "source": "/openapi.json", "destination": "/api/index" }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/chat", "dest": "/api/index" },
+    { "src": "/generate_sbar", "dest": "/api/index" },
+    { "src": "/process_report", "dest": "/api/index" },
+    { "src": "/docs", "dest": "/api/index" },
+    { "src": "/openapi.json", "dest": "/api/index" }
   ]
 }
