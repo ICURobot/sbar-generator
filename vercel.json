@@ -1,5 +1,9 @@
 {
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
+    { "source": "/chat", "destination": "/api/index" },
+    { "source": "/generate_sbar", "destination": "/api/index" },
+    { "source": "/process_report", "destination": "/api/index" },
+    { "source": "/docs", "destination": "/api/index" },
+    { "source": "/openapi.json", "destination": "/api/index" }
   ]
 }
