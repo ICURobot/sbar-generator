@@ -1,0 +1,13 @@
+# Local development dependencies (NOT for Vercel deployment)
+# Install with: pip install -r requirements-local.txt
+# These packages are too large for Vercel's deployment limits
+
+# Vectorization (for local book ingestion)
+sentence-transformers>=3.2.0
+huggingface-hub>=0.26.0
+
+# PDF processing (for local book ingestion)
+pypdf==3.17.4
+pymupdf==1.23.8
+pillow==10.2.0
+

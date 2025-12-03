@@ -21,9 +21,24 @@ A full-stack AI application for generating ICU SBAR (Situation, Background, Asse
 
 ### 1. Install Python Dependencies
 
+**For Local Development (with vectorization support):**
 ```bash
+# Install base requirements (for API server)
 pip install -r requirements.txt
+
+# Install local-only requirements (for book ingestion/vectorization)
+pip install -r requirements-local.txt
 ```
+
+**Or use the setup script:**
+```bash
+./setup-local.sh
+```
+
+**For Vercel Deployment:**
+- Only `requirements.txt` is used (sentence-transformers removed to fit Vercel's size limits)
+- The API uses Vertex AI's TextEmbeddingModel instead of sentence-transformers
+- Local vectorization (ingest_book.py) requires `requirements-local.txt`
 
 ### 2. Set Up Environment Variables
 
@@ -149,18 +164,79 @@ Generate an SBAR report from patient data.
 ```
 sbar-generator/
 ├── main.py                 # FastAPI backend
-├── ingest_book.py          # PDF ingestion script
-├── requirements.txt        # Python dependencies
+├── ingest_book.py          # PDF ingestion script (local only, requires sentence-transformers)
+├── api/
+│   └── vercel_entry.py     # Vercel entry point (imports from main.py)
+├── requirements.txt        # Production dependencies (for Vercel)
+├── requirements-local.txt  # Local-only dependencies (sentence-transformers, PDF libs)
+├── setup-local.sh          # Local development setup script
+├── vercel.json             # Vercel deployment configuration
 ├── index.html             # Frontend UI
 ├── script.js              # Frontend JavaScript
-├── icu_book.pdf          # ICU textbook (add this file)
-├── google_credentials.json # Google Cloud credentials (add this file)
-└── .env                   # Environment variables (create this file)
+├── books/                  # PDF books directory (local only)
+├── google_credentials.json # Google Cloud credentials (add this file, gitignored)
+└── .env                   # Environment variables (create this file, gitignored)
 ```
 
-## Deployment to Render.com
+## Local vs Production Setup
 
-This app is configured for deployment on Render.com.
+### Local Development
+- **Use `requirements-local.txt`** for full functionality including:
+  - `sentence-transformers` for local book ingestion
+  - PDF processing libraries
+  - All vectorization tools
+- Run `ingest_book.py` locally to vectorize books
+- The API can use either sentence-transformers (local) or Vertex AI embeddings (production)
+
+### Production (Vercel)
+- **Only `requirements.txt` is deployed** (minimal dependencies)
+- Uses Vertex AI's TextEmbeddingModel for embeddings (no sentence-transformers needed)
+- Vectorization must be done locally, then data is uploaded to Turso
+- `requirements-local.txt` is NOT used in production
+
+### Workflow
+1. **Local**: Install `requirements-local.txt` → Run `ingest_book.py` → Vectorize books → Upload to Turso
+2. **Production**: Deploy with `requirements.txt` → API uses Vertex AI for embeddings → Reads from Turso
+
+## Deployment to Vercel
+
+This app is configured for deployment on Vercel.
+
+### 1. Connect Your Repository
+
+1. Go to [Vercel.com](https://vercel.com) and sign in
+2. Click "New Project"
+3. Import your GitHub repository
+4. Select the `sbar-generator` repository
+
+### 2. Configure Environment Variables
+
+In Vercel's dashboard, add these environment variables:
+
+- `GOOGLE_APPLICATION_CREDENTIALS`: Your Google Cloud credentials JSON (as environment variable or secret)
+- `GOOGLE_CLOUD_PROJECT_ID`: Your Google Cloud project ID
+- `GOOGLE_CLOUD_LOCATION`: `us-central1`
+- `TURSO_DATABASE_URL`: Your Turso database URL
+- `TURSO_AUTH_TOKEN`: Your Turso auth token
+
+### 3. Build Settings
+
+Vercel will automatically:
+- Detect Python from `requirements.txt`
+- Build using the `api/vercel_entry.py` entry point
+- Deploy with 60-second timeout for AI generation
+
+### 4. Update Frontend API URL
+
+After deployment, update `script.js` to point to your Vercel URL instead of `http://localhost:8000`:
+
+```javascript
+const API_BASE_URL = 'https://your-app-name.vercel.app';
+```
+
+## Deployment to Render.com (Legacy)
+
+This app can also be deployed on Render.com.
 
 ### 1. Connect Your Repository
 
