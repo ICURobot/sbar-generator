@@ -1,13 +1,13 @@
 {
   "functions": {
-    "api/index.py": {
+    "api/vercel_entry.py": {
       "maxDuration": 60
     }
   },
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/api/index.py"
+      "dest": "/api/vercel_entry.py"
     },
     {
       "src": "/(.*\\.(html|js|css|png|jpg|jpeg|gif|svg|ico|json))",
