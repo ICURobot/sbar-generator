@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const response = await fetch('http://localhost:8000/process_report', {
+            const response = await fetch('/process_report', {
                 method: 'POST',
                 mode: 'cors',
                 headers: {
@@ -308,7 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         try {
             // Call FastAPI backend
-            const response = await fetch('http://localhost:8000/generate_sbar', {
+            const response = await fetch('/generate_sbar', {
                 method: 'POST',
                 mode: 'cors',
                 headers: { 
@@ -326,7 +326,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderReport(lastReportJson);
         } catch (error) {
             // This will now only catch network errors or other unexpected issues
-            reportContentContainer.innerHTML = `<div class="p-6"><p class="text-red-500 font-semibold">A network error occurred: ${error.message}. Make sure the FastAPI server is running on http://localhost:8000</p></div>`;
+            reportContentContainer.innerHTML = `<div class="p-6"><p class="text-red-500 font-semibold">A network error occurred: ${error.message}.</p></div>`;
         }
     }
     
@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatLoading.classList.remove('hidden');
 
         try {
-            const response = await fetch('http://localhost:8000/chat', {
+            const response = await fetch('/chat', {
                 method: 'POST',
                 mode: 'cors',
                 headers: { 
@@ -485,7 +485,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 chatMessages.appendChild(sourcesDiv);
             }
         } catch (error) {
-            addChatMessage(`Network error: ${error.message}. Make sure the FastAPI server is running on http://localhost:8000`);
+            addChatMessage(`Network error: ${error.message}.`);
         } finally {
             chatSendBtn.disabled = false;
             chatLoading.classList.add('hidden');
