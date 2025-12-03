@@ -14,8 +14,8 @@ from google.cloud import aiplatform
 from google.oauth2 import service_account
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part
-from vertexai.language_models import TextEmbeddingModel
 import numpy as np
+import requests
 from libsql_experimental import connect
 from dotenv import load_dotenv
 
@@ -32,19 +32,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Embedding model - try sentence-transformers first (local, free), fall back to Vertex AI (production)
-embedding_model = None
-embedding_model_type = None  # 'sentence_transformers' or 'vertex_ai'
+# Google AI Studio API configuration for embeddings
+GOOGLE_AI_STUDIO_API_KEY = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+EMBEDDING_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
 
-# Try to use sentence-transformers first (free, local only)
-try:
-    from sentence_transformers import SentenceTransformer
-    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-    embedding_model_type = 'sentence_transformers'
-    print("✅ Using sentence-transformers for embeddings (free, local)")
-except ImportError:
-    print("ℹ️  sentence-transformers not available (expected on Vercel)")
-    embedding_model = None
+if not GOOGLE_AI_STUDIO_API_KEY or GOOGLE_AI_STUDIO_API_KEY == "your-api-key-here":
+    print("⚠️  Warning: GOOGLE_AI_STUDIO_API_KEY not set - vector search will be disabled")
+else:
+    print("✅ Google AI Studio API configured for embeddings")
 
 # Initialize Vertex AI (with graceful handling for missing credentials)
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
@@ -68,21 +63,12 @@ if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
         )
         vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
         model = GenerativeModel("gemini-2.0-flash-exp")
-        
-        # Only use Vertex AI embeddings if sentence-transformers is not available
-        if embedding_model is None:
-            embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
-            embedding_model_type = 'vertex_ai'
-            print(f"✅ Vertex AI initialized (Project: {PROJECT_ID}) - using Vertex AI embeddings")
-        else:
-            print(f"✅ Vertex AI initialized (Project: {PROJECT_ID}) - using sentence-transformers for embeddings")
+        print(f"✅ Vertex AI initialized (Project: {PROJECT_ID})")
     except Exception as e:
         print(f"⚠️  Warning: Could not initialize Vertex AI: {e}")
         print("   API endpoints will return errors until credentials are configured")
 else:
     print("⚠️  Warning: Google credentials file not found")
-    if embedding_model is None:
-        print("   ⚠️  No embedding model available - vector search will be disabled")
     print("   API endpoints will return errors until credentials are configured")
 
 # Turso connection (optional for now)
@@ -103,45 +89,60 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     return dot_product / (norm1 * norm2)
 
 def get_embedding(text: str) -> np.ndarray:
-    """Get embedding using available model (sentence-transformers or Vertex AI)."""
-    if embedding_model is None:
-        raise ValueError("Embedding model not initialized")
+    """Get embedding using Google AI Studio API (text-embedding-004)."""
+    if not GOOGLE_AI_STUDIO_API_KEY or GOOGLE_AI_STUDIO_API_KEY == "your-api-key-here":
+        raise ValueError("GOOGLE_AI_STUDIO_API_KEY not configured")
     
-    if embedding_model_type == 'sentence_transformers':
-        # Use sentence-transformers (free, local)
-        embedding = embedding_model.encode(text, convert_to_numpy=True)
-        return embedding.astype(np.float32)
-    elif embedding_model_type == 'vertex_ai':
-        # Use Vertex AI (paid, production)
-        embeddings = embedding_model.get_embeddings([text])
-        return np.array(embeddings[0].values, dtype=np.float32)
-    else:
-        raise ValueError("Unknown embedding model type")
+    headers = {
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "model": "models/text-embedding-004",
+        "content": {
+            "parts": [{"text": text}]
+        }
+    }
+    
+    params = {
+        "key": GOOGLE_AI_STUDIO_API_KEY
+    }
+    
+    try:
+        response = requests.post(EMBEDDING_API_URL, json=payload, headers=headers, params=params)
+        response.raise_for_status()
+        
+        result = response.json()
+        embedding_values = result.get("embedding", {}).get("values", [])
+        
+        if not embedding_values:
+            raise ValueError("No embedding values returned from API")
+        
+        return np.array(embedding_values, dtype=np.float32)
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error calling Google AI Studio API: {e}")
+    except KeyError as e:
+        raise Exception(f"Unexpected API response format: {e}")
 
 def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Search Turso database for relevant knowledge chunks.
     Returns list of chunks with their text and metadata.
-    
-    Note: This requires sentence-transformers to match the embeddings stored in Turso.
-    On Vercel (where sentence-transformers is not available), this returns empty results.
+    Uses Google AI Studio API for embeddings (matches embeddings stored in Turso).
     """
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         return []  # Return empty if Turso not configured
-    if embedding_model is None:
-        return []  # Return empty if embedding model not initialized
-    
-    # Only use sentence-transformers embeddings (matches what's stored in Turso)
-    # Vertex AI embeddings have different dimensions and won't work
-    if embedding_model_type != 'sentence_transformers':
-        # On Vercel, sentence-transformers isn't available, so vector search is disabled
-        # This is expected - the embeddings in Turso were created with sentence-transformers
-        return []  # Return empty - vector search disabled on Vercel
+    if not GOOGLE_AI_STUDIO_API_KEY or GOOGLE_AI_STUDIO_API_KEY == "your-api-key-here":
+        return []  # Return empty if API key not configured
     
     client = get_turso_client()
 
-    # Generate query embedding using sentence-transformers (matches stored embeddings)
-    query_embedding = get_embedding(query)
+    # Generate query embedding using Google AI Studio API (matches stored embeddings)
+    try:
+        query_embedding = get_embedding(query)
+    except Exception as e:
+        print(f"⚠️  Error generating embedding: {e}")
+        return []  # Return empty if embedding generation fails
     
     # Get all chunks from database
     # Note: Turso doesn't have native vector similarity search, so we'll do it in memory

@@ -6,7 +6,6 @@ import os
 import sys
 from pathlib import Path
 import fitz  # PyMuPDF
-from sentence_transformers import SentenceTransformer
 import numpy as np
 from libsql_experimental import connect
 from dotenv import load_dotenv
@@ -15,6 +14,7 @@ from vertexai.preview.generative_models import GenerativeModel, Part
 from google.oauth2 import service_account
 import json
 import time
+import requests
 
 load_dotenv()
 
@@ -23,9 +23,64 @@ CHUNK_SIZE = 300  # words per chunk
 CHUNK_OVERLAP = 50  # overlapping words
 TABLE_NAME = "medical_knowledge"
 
-# Initialize sentence transformer model
-print("Loading sentence transformer model...")
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Lightweight, fast model
+# Google AI Studio API configuration
+GOOGLE_AI_STUDIO_API_KEY = os.getenv("GOOGLE_AI_STUDIO_API_KEY")
+if not GOOGLE_AI_STUDIO_API_KEY:
+    raise ValueError("GOOGLE_AI_STUDIO_API_KEY not found in environment variables. Please set it in .env file.")
+
+EMBEDDING_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
+
+def get_embedding_google_ai_studio(text: str) -> np.ndarray:
+    """
+    Get embedding using Google AI Studio API (text-embedding-004).
+    Returns a numpy array of the embedding vector.
+    """
+    headers = {
+        "Content-Type": "application/json",
+    }
+    
+    payload = {
+        "model": "models/text-embedding-004",
+        "content": {
+            "parts": [{"text": text}]
+        }
+    }
+    
+    params = {
+        "key": GOOGLE_AI_STUDIO_API_KEY
+    }
+    
+    try:
+        response = requests.post(EMBEDDING_API_URL, json=payload, headers=headers, params=params)
+        response.raise_for_status()
+        
+        result = response.json()
+        embedding_values = result.get("embedding", {}).get("values", [])
+        
+        if not embedding_values:
+            raise ValueError("No embedding values returned from API")
+        
+        return np.array(embedding_values, dtype=np.float32)
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Error calling Google AI Studio API: {e}")
+    except KeyError as e:
+        raise Exception(f"Unexpected API response format: {e}")
+
+def get_embeddings_batch_google_ai_studio(texts: list) -> list:
+    """
+    Get embeddings for a batch of texts using Google AI Studio API.
+    Note: The API may have rate limits, so we'll process one at a time with a small delay.
+    """
+    embeddings = []
+    for i, text in enumerate(texts):
+        if i > 0 and i % 10 == 0:
+            print(f"    Processed {i}/{len(texts)} embeddings...")
+            time.sleep(0.1)  # Small delay to avoid rate limits
+        embedding = get_embedding_google_ai_studio(text)
+        embeddings.append(embedding)
+    return embeddings
+
+print("✅ Using Google AI Studio API for embeddings (text-embedding-004)")
 
 # Initialize Vertex AI for Gemini Vision
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
@@ -271,9 +326,9 @@ def process_pdf(pdf_path, book_title=None, client=None):
         emb_batch = chunks[emb_i:emb_i + embedding_batch_size]
         chunk_texts = [chunk['text'] for chunk in emb_batch]
         
-        # Generate embeddings for batch
+        # Generate embeddings for batch using Google AI Studio API
         print(f"Generating embeddings for batch {emb_i//embedding_batch_size + 1}/{(len(chunks) + embedding_batch_size - 1)//embedding_batch_size}...")
-        embeddings = embedding_model.encode(chunk_texts, show_progress_bar=False)
+        embeddings = get_embeddings_batch_google_ai_studio(chunk_texts)
         
         # Prepare data for batch insertion
         batch_data = []

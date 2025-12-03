@@ -11,3 +11,6 @@ pypdf==3.17.4
 pymupdf==1.23.8
 pillow==10.2.0
 
+# HTTP requests for Google AI Studio API
+requests>=2.31.0
+
