@@ -1,13 +1,14 @@
 {
   "rewrites": [
-    { "source": "/chat", "destination": "/api/vercel_entry.py" },
-    { "source": "/generate_sbar", "destination": "/api/vercel_entry.py" },
-    { "source": "/process_report", "destination": "/api/vercel_entry.py" },
-    { "source": "/docs", "destination": "/api/vercel_entry.py" },
-    { "source": "/openapi.json", "destination": "/api/vercel_entry.py" }
+    { "source": "/chat", "destination": "/api/vercel_entry" },
+    { "source": "/generate_sbar", "destination": "/api/vercel_entry" },
+    { "source": "/process_report", "destination": "/api/vercel_entry" },
+    { "source": "/docs", "destination": "/api/vercel_entry" },
+    { "source": "/openapi.json", "destination": "/api/vercel_entry" },
+    { "source": "/(.*)", "destination": "/api/vercel_entry" }
   ],
   "functions": {
-    "api/vercel_entry.py": {
+    "api/**/*.py": {
       "maxDuration": 60,
       "memory": 1024
     }
