@@ -12,9 +12,9 @@ from google.cloud import aiplatform
 from google.oauth2 import service_account
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel, Part
+from vertexai.language_models import TextEmbeddingModel
 import numpy as np
 from libsql_experimental import connect
-from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,9 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize models
-print("Loading sentence transformer model...")
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+# Embedding model will be initialized after Vertex AI
+embedding_model = None
 
 # Initialize Vertex AI (with graceful handling for missing credentials)
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
@@ -56,6 +55,7 @@ if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
         )
         vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
         model = GenerativeModel("gemini-2.0-flash-exp")
+        embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
         print(f"✅ Vertex AI initialized successfully (Project: {PROJECT_ID})")
     except Exception as e:
         print(f"⚠️  Warning: Could not initialize Vertex AI: {e}")
@@ -81,6 +81,13 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
         return 0.0
     return dot_product / (norm1 * norm2)
 
+def get_embedding(text: str) -> np.ndarray:
+    """Get embedding using Vertex AI text-embedding model."""
+    if embedding_model is None:
+        raise ValueError("Embedding model not initialized")
+    embeddings = embedding_model.get_embeddings([text])
+    return np.array(embeddings[0].values, dtype=np.float32)
+
 def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Search Turso database for relevant knowledge chunks.
@@ -88,11 +95,12 @@ def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         return []  # Return empty if Turso not configured
+    if embedding_model is None:
+        return []  # Return empty if embedding model not initialized
     client = get_turso_client()
-    
-    # Generate query embedding
-    query_embedding = embedding_model.encode(query)
-    query_embedding_bytes = query_embedding.tobytes()
+
+    # Generate query embedding using Vertex AI
+    query_embedding = get_embedding(query)
     
     # Get all chunks from database
     # Note: Turso doesn't have native vector similarity search, so we'll do it in memory
