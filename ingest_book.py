@@ -102,13 +102,19 @@ def extract_text_from_pdf_with_gemini(pdf_path, book_title=None):
         
         print(f"   Processing page {page_num + 1}/{total_pages} with Gemini Vision...", end=" ", flush=True)
         
-        try:
-            # Create image part for Gemini
-            image_part = Part.from_data(data=img_data, mime_type="image/png")
-            
-            # Prompt for Gemini to extract text
-            prompt = """Extract all text from this medical textbook page. 
-            
+        # Retry logic with exponential backoff for rate limits
+        max_retries = 3
+        retry_delay = 1  # Start with 1 second
+        page_text = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Create image part for Gemini
+                image_part = Part.from_data(data=img_data, mime_type="image/png")
+                
+                # Prompt for Gemini to extract text
+                prompt = """Extract all text from this medical textbook page. 
+                
 Please:
 1. Extract ALL visible text including headers, body text, captions, footnotes, and any text in tables or diagrams
 2. Preserve the structure and formatting as much as possible (use line breaks appropriately)
@@ -118,26 +124,43 @@ Please:
 6. For multi-column layouts, maintain column separation
 
 Return ONLY the extracted text, nothing else. Do not add explanations or summaries."""
-            
-            # Get response from Gemini
-            response = gemini_model.generate_content([image_part, prompt])
-            page_text = response.text.strip()
-            
+                
+                # Get response from Gemini
+                response = gemini_model.generate_content([image_part, prompt])
+                page_text = response.text.strip()
+                break  # Success, exit retry loop
+                
+            except Exception as e:
+                error_str = str(e).lower()
+                # Check if it's a rate limit error (429 or "resource exhausted")
+                is_rate_limit = "429" in error_str or "resource exhausted" in error_str or "quota" in error_str
+                
+                if is_rate_limit and attempt < max_retries - 1:
+                    # Exponential backoff: 1s, 2s, 4s
+                    wait_time = retry_delay * (2 ** attempt)
+                    print(f"⏳ Rate limited, waiting {wait_time}s before retry...", end=" ", flush=True)
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    # Not a rate limit error, or max retries reached
+                    print(f"❌ Error: {e}")
+                    # Fallback: try basic text extraction from PDF
+                    try:
+                        page_text = page.get_text()
+                        full_text += f"\n\n--- Page {page_num + 1} (fallback extraction) ---\n\n{page_text}"
+                        print(f"   Used fallback extraction ({len(page_text)} characters)")
+                    except:
+                        print(f"   ⚠️  Skipped page {page_num + 1}")
+                    page_text = None
+                    break
+        
+        if page_text:
             full_text += f"\n\n--- Page {page_num + 1} ---\n\n{page_text}"
             print(f"✅ ({len(page_text)} characters)")
-            
-            # Rate limiting - longer delay to avoid hitting API limits (15 requests per minute)
-            time.sleep(4)  # ~15 requests per minute
-            
-        except Exception as e:
-            print(f"❌ Error: {e}")
-            # Fallback: try basic text extraction from PDF
-            try:
-                page_text = page.get_text()
-                full_text += f"\n\n--- Page {page_num + 1} (fallback extraction) ---\n\n{page_text}"
-                print(f"   Used fallback extraction ({len(page_text)} characters)")
-            except:
-                print(f"   ⚠️  Skipped page {page_num + 1}")
+        
+        # Rate limiting: 1 second delay (allows up to 60 RPM, well under typical limits)
+        # If you hit rate limits, the exponential backoff above will handle it
+        time.sleep(1)
     
     doc.close()
     return full_text, book_title

@@ -202,19 +202,61 @@ async def generate_sbar(request: GenerateSBARRequest):
     try:
         patient_data = request.patientData
         
-        # Extract diagnosis for knowledge search
+        # Extract key patient information for multiple targeted searches
         diagnosis = patient_data.get("diagnosis", "").strip()
+        vent_settings = patient_data.get("vent-settings", "")
+        drips = patient_data.get("drips", "")
+        medications = patient_data.get("medications", "")
         
-        # Search for relevant guidelines/protocols based on diagnosis
-        search_query = diagnosis if diagnosis else "ICU patient care guidelines"
-        relevant_chunks = search_turso_knowledge(search_query, top_k=5)
+        # Perform multiple searches to get comprehensive knowledge base coverage
+        all_chunks = []
+        seen_chunk_ids = set()
         
-        # Build context from relevant chunks
+        # Search 1: Primary diagnosis
+        if diagnosis:
+            chunks = search_turso_knowledge(diagnosis, top_k=8)
+            for chunk in chunks:
+                if chunk['id'] not in seen_chunk_ids:
+                    all_chunks.append(chunk)
+                    seen_chunk_ids.add(chunk['id'])
+        
+        # Search 2: Ventilator/Respiratory management if applicable
+        if vent_settings or patient_data.get("o2-delivery"):
+            resp_query = f"{diagnosis} ventilator management respiratory care" if diagnosis else "ventilator management respiratory care"
+            chunks = search_turso_knowledge(resp_query, top_k=5)
+            for chunk in chunks:
+                if chunk['id'] not in seen_chunk_ids:
+                    all_chunks.append(chunk)
+                    seen_chunk_ids.add(chunk['id'])
+        
+        # Search 3: Medication/drip management if applicable
+        if drips or medications:
+            med_query = f"{diagnosis} medication management drips" if diagnosis else "ICU medication management drips"
+            chunks = search_turso_knowledge(med_query, top_k=5)
+            for chunk in chunks:
+                if chunk['id'] not in seen_chunk_ids:
+                    all_chunks.append(chunk)
+                    seen_chunk_ids.add(chunk['id'])
+        
+        # Search 4: General ICU care guidelines if we don't have enough chunks
+        if len(all_chunks) < 5:
+            chunks = search_turso_knowledge("ICU patient care guidelines protocols", top_k=5)
+            for chunk in chunks:
+                if chunk['id'] not in seen_chunk_ids:
+                    all_chunks.append(chunk)
+                    seen_chunk_ids.add(chunk['id'])
+        
+        # Sort by similarity and take top chunks
+        all_chunks.sort(key=lambda x: x['similarity'], reverse=True)
+        relevant_chunks = all_chunks[:10]  # Use top 10 most relevant chunks
+        
+        # Build context from relevant chunks with clear source attribution
         context_parts = []
-        for chunk in relevant_chunks:
+        for i, chunk in enumerate(relevant_chunks, 1):
             page_info = f" (Page {chunk['page_number']})" if chunk['page_number'] else ""
             book_info = f" [From: {chunk.get('book_title', 'Unknown')}]" if chunk.get('book_title') else ""
-            context_parts.append(f"{chunk['text']}{book_info}{page_info}")
+            similarity = f" [Relevance: {chunk['similarity']:.2f}]" if chunk.get('similarity') else ""
+            context_parts.append(f"[Source {i}{book_info}{page_info}{similarity}]\n{chunk['text']}")
         
         guidelines_context = "\n\n---\n\n".join(context_parts) if context_parts else "No specific guidelines found for this diagnosis."
         
@@ -231,27 +273,24 @@ INSTRUCTIONS FOR EACH SECTION:
 1. "situation": Concise summary of current patient status and immediate concerns
 2. "background": Patient history, diagnosis, and relevant past medical information
 3. "assessment": System-by-system assessment (Neurological, Cardiovascular, Respiratory, GI/GU, etc.) based on the provided data
-4. "recommendation": Act as an experienced ICU Charge Nurse. Provide a practical, actionable to-do list for the next nurse's shift
+4. "recommendation": **CRITICAL: This section MUST be directly based on the RELEVANT CLINICAL GUIDELINES FROM TEXTBOOK above.** Act as an experienced ICU Charge Nurse. Review the textbook guidelines and extract specific, actionable recommendations that apply to this patient's condition. Structure your recommendations by priority (immediate, short-term, ongoing) and reference the relevant guidelines. Include specific monitoring parameters, intervention thresholds, and care protocols from the textbook that are applicable to this patient. If the guidelines mention specific protocols, medications, or interventions for this diagnosis/condition, incorporate them into your recommendations.
 5. "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations informed by the textbook guidelines above. Structure by system.
 
 CRITICAL SAFETY CHECK: Review the patient's listed allergies against all medications mentioned. If there is a potential conflict, state this as the VERY FIRST point in "ai_suggestion" preceded with "!!! CRITICAL SAFETY ALERT:".
 
 IMPORTANT: 
-- Use the clinical guidelines from the textbook to inform your recommendations
-- Be specific and actionable
+- **The "recommendation" section is the MOST CRITICAL and MUST be grounded in the textbook guidelines above. Do not provide generic recommendations - extract specific protocols, monitoring requirements, and interventions from the textbook sources.**
+- Use the clinical guidelines from the textbook to inform ALL sections, but especially the "recommendation" section
+- Be specific and actionable - cite specific parameters, thresholds, or protocols from the textbook when applicable
 - Maintain professional medical terminology
+- If the textbook guidelines don't contain relevant information for a specific aspect, you may use your clinical knowledge, but prioritize textbook guidance
 - Conclude "ai_suggestion" with: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
 
 Generate the JSON object now. Return ONLY valid JSON, no markdown formatting.
 """
         
         # Generate response using Gemini 2.0
-        response = model.generate_content(
-            prompt,
-            generation_config={
-                "response_mime_type": "application/json"
-            }
-        )
+        response = model.generate_content(prompt)
         
         # Parse JSON response
         import json
@@ -332,10 +371,7 @@ For each field:
 Return ONLY a valid JSON object with the extracted data. Do not include any explanatory text."""
             
             # Use Gemini with vision
-            response = model.generate_content(
-                [image_part, prompt_text],
-                generation_config={"response_mime_type": "application/json"}
-            )
+            response = model.generate_content([image_part, prompt_text])
             
         elif input_type in ["voice", "text"] and text:
             # Process text (voice transcript or free text)
@@ -357,10 +393,7 @@ Return ONLY the final JSON object, no markdown formatting.
 {text}
 ---"""
             
-            response = model.generate_content(
-                prompt_text,
-                generation_config={"response_mime_type": "application/json"}
-            )
+            response = model.generate_content(prompt_text)
         else:
             raise HTTPException(status_code=400, detail="Invalid input: provide text for voice/text input or image for image input")
         
