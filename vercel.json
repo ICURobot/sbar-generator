@@ -1,23 +1,15 @@
 {
-  "version": 2,
+  "rewrites": [
+    { "source": "/chat", "destination": "/api/vercel_entry.py" },
+    { "source": "/generate_sbar", "destination": "/api/vercel_entry.py" },
+    { "source": "/process_report", "destination": "/api/vercel_entry.py" },
+    { "source": "/docs", "destination": "/api/vercel_entry.py" },
+    { "source": "/openapi.json", "destination": "/api/vercel_entry.py" }
+  ],
   "functions": {
-    "api/**/*.py": {
-      "memory": 1024,
-      "maxDuration": 60
+    "api/vercel_entry.py": {
+      "maxDuration": 60,
+      "memory": 1024
     }
-  },
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/vercel_entry.py"
-    },
-    {
-      "src": "/(.*\\.(html|js|css|png|jpg|jpeg|gif|svg|ico|json))",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+  }
 }
