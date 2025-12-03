@@ -32,8 +32,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Embedding model will be initialized after Vertex AI
+# Embedding model - try sentence-transformers first (local, free), fall back to Vertex AI (production)
 embedding_model = None
+embedding_model_type = None  # 'sentence_transformers' or 'vertex_ai'
+
+# Try to use sentence-transformers first (free, local only)
+try:
+    from sentence_transformers import SentenceTransformer
+    embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+    embedding_model_type = 'sentence_transformers'
+    print("✅ Using sentence-transformers for embeddings (free, local)")
+except ImportError:
+    print("ℹ️  sentence-transformers not available (expected on Vercel)")
+    embedding_model = None
 
 # Initialize Vertex AI (with graceful handling for missing credentials)
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
@@ -57,13 +68,21 @@ if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
         )
         vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
         model = GenerativeModel("gemini-2.0-flash-exp")
-        embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
-        print(f"✅ Vertex AI initialized successfully (Project: {PROJECT_ID})")
+        
+        # Only use Vertex AI embeddings if sentence-transformers is not available
+        if embedding_model is None:
+            embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
+            embedding_model_type = 'vertex_ai'
+            print(f"✅ Vertex AI initialized (Project: {PROJECT_ID}) - using Vertex AI embeddings")
+        else:
+            print(f"✅ Vertex AI initialized (Project: {PROJECT_ID}) - using sentence-transformers for embeddings")
     except Exception as e:
         print(f"⚠️  Warning: Could not initialize Vertex AI: {e}")
         print("   API endpoints will return errors until credentials are configured")
 else:
     print("⚠️  Warning: Google credentials file not found")
+    if embedding_model is None:
+        print("   ⚠️  No embedding model available - vector search will be disabled")
     print("   API endpoints will return errors until credentials are configured")
 
 # Turso connection (optional for now)
@@ -84,24 +103,44 @@ def cosine_similarity(vec1: np.ndarray, vec2: np.ndarray) -> float:
     return dot_product / (norm1 * norm2)
 
 def get_embedding(text: str) -> np.ndarray:
-    """Get embedding using Vertex AI text-embedding model."""
+    """Get embedding using available model (sentence-transformers or Vertex AI)."""
     if embedding_model is None:
         raise ValueError("Embedding model not initialized")
-    embeddings = embedding_model.get_embeddings([text])
-    return np.array(embeddings[0].values, dtype=np.float32)
+    
+    if embedding_model_type == 'sentence_transformers':
+        # Use sentence-transformers (free, local)
+        embedding = embedding_model.encode(text, convert_to_numpy=True)
+        return embedding.astype(np.float32)
+    elif embedding_model_type == 'vertex_ai':
+        # Use Vertex AI (paid, production)
+        embeddings = embedding_model.get_embeddings([text])
+        return np.array(embeddings[0].values, dtype=np.float32)
+    else:
+        raise ValueError("Unknown embedding model type")
 
 def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Search Turso database for relevant knowledge chunks.
     Returns list of chunks with their text and metadata.
+    
+    Note: This requires sentence-transformers to match the embeddings stored in Turso.
+    On Vercel (where sentence-transformers is not available), this returns empty results.
     """
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         return []  # Return empty if Turso not configured
     if embedding_model is None:
         return []  # Return empty if embedding model not initialized
+    
+    # Only use sentence-transformers embeddings (matches what's stored in Turso)
+    # Vertex AI embeddings have different dimensions and won't work
+    if embedding_model_type != 'sentence_transformers':
+        # On Vercel, sentence-transformers isn't available, so vector search is disabled
+        # This is expected - the embeddings in Turso were created with sentence-transformers
+        return []  # Return empty - vector search disabled on Vercel
+    
     client = get_turso_client()
 
-    # Generate query embedding using Vertex AI
+    # Generate query embedding using sentence-transformers (matches stored embeddings)
     query_embedding = get_embedding(query)
     
     # Get all chunks from database

@@ -6,7 +6,7 @@ A full-stack AI application for generating ICU SBAR (Situation, Background, Asse
 
 - **AI-Powered SBAR Generation**: Generate professional SBAR handoff reports using patient data and ICU textbook knowledge
 - **Knowledge Base Chat**: Ask questions about ICU protocols, medications, and patient care
-- **Vector Search**: Semantic search through ICU textbook content using embeddings
+- **Vector Search**: Semantic search through ICU textbook content using embeddings (local only - uses free sentence-transformers)
 - **Voice Input**: Speech-to-text for quick form filling (existing feature)
 
 ## Tech Stack
@@ -14,7 +14,7 @@ A full-stack AI application for generating ICU SBAR (Situation, Background, Asse
 - **Backend**: FastAPI (Python)
 - **AI**: Google Vertex AI (Gemini 2.0 Flash)
 - **Vector DB**: Turso (libSQL)
-- **Embeddings**: Sentence Transformers (all-MiniLM-L6-v2)
+- **Embeddings**: Sentence Transformers (all-MiniLM-L6-v2) for local vectorization and search
 - **Frontend**: HTML, JavaScript, Tailwind CSS
 
 ## Setup Instructions
