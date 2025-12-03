@@ -35,7 +35,14 @@ print("Loading sentence transformer model...")
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 # Initialize Vertex AI (with graceful handling for missing credentials)
-GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
+# Check both current directory (api/) and parent directory for credentials
+default_creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
+# If relative path, check parent directory too (for Vercel deployment)
+if not os.path.isabs(default_creds_path) and not os.path.exists(default_creds_path):
+    parent_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "google_credentials.json")
+    if os.path.exists(parent_path):
+        default_creds_path = parent_path
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", default_creds_path)
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
 
 # Initialize Vertex AI only if credentials are available
