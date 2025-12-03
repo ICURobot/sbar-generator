@@ -1,10 +1,5 @@
 {
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/chat", "dest": "/api/index" },
-    { "src": "/generate_sbar", "dest": "/api/index" },
-    { "src": "/process_report", "dest": "/api/index" },
-    { "src": "/docs", "dest": "/api/index" },
-    { "src": "/openapi.json", "dest": "/api/index" }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
   ]
 }

@@ -3,9 +3,11 @@ FastAPI Backend for ICU SBAR Generator
 Uses Google Vertex AI (Gemini 2.0) and Turso Vector DB
 """
 import os
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 import base64
 from google.cloud import aiplatform
@@ -145,8 +147,32 @@ class GenerateSBARRequest(BaseModel):
 class GenerateSBARResponse(BaseModel):
     report: Dict[str, str]
 
-@app.get("/")
+# Get the directory where this script is located
+BASE_DIR = Path(__file__).resolve().parent
+
+@app.get("/", response_class=HTMLResponse)
 def root():
+    """Serve the frontend HTML."""
+    html_path = BASE_DIR / "api" / "index.html"
+    if not html_path.exists():
+        # Try alternative path (when running from api folder)
+        html_path = BASE_DIR / "index.html"
+    if html_path.exists():
+        return html_path.read_text()
+    return {"message": "ICU SBAR Generator API", "status": "running"}
+
+@app.get("/script.js")
+def serve_script():
+    """Serve the frontend JavaScript."""
+    js_path = BASE_DIR / "api" / "script.js"
+    if not js_path.exists():
+        js_path = BASE_DIR / "script.js"
+    if js_path.exists():
+        return FileResponse(js_path, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="Script not found")
+
+@app.get("/health")
+def health():
     return {"message": "ICU SBAR Generator API", "status": "running"}
 
 @app.post("/chat", response_model=ChatResponse)
