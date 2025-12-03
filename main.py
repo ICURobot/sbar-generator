@@ -42,25 +42,64 @@ else:
     print("✅ Google AI Studio API configured for embeddings")
 
 # Initialize Vertex AI (with graceful handling for missing credentials)
+# Supports both file path (local) and JSON string (Vercel/production)
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "google_credentials.json")
 LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "us-central1")
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
 
 # Initialize Vertex AI only if credentials are available
 model = None
-if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+credentials = None
+creds_data = None
+
+# Try to load credentials from environment variable (JSON string) - for Vercel
+if GOOGLE_APPLICATION_CREDENTIALS and GOOGLE_APPLICATION_CREDENTIALS != "google_credentials.json":
     try:
-        # Read project_id from the credentials file automatically
         import json
-        with open(GOOGLE_APPLICATION_CREDENTIALS, 'r') as f:
+        # Check if it's a JSON string (starts with {)
+        if GOOGLE_APPLICATION_CREDENTIALS.strip().startswith('{'):
+            creds_data = json.loads(GOOGLE_APPLICATION_CREDENTIALS)
+            credentials = service_account.Credentials.from_service_account_info(creds_data)
+            print("✅ Loaded Google credentials from environment variable")
+        # Otherwise, treat it as a file path
+        elif os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+            with open(GOOGLE_APPLICATION_CREDENTIALS, 'r') as f:
+                creds_data = json.load(f)
+            credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
+            print("✅ Loaded Google credentials from file")
+    except json.JSONDecodeError:
+        # Not JSON, try as file path
+        if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
+            try:
+                with open(GOOGLE_APPLICATION_CREDENTIALS, 'r') as f:
+                    creds_data = json.load(f)
+                credentials = service_account.Credentials.from_service_account_file(GOOGLE_APPLICATION_CREDENTIALS)
+                print("✅ Loaded Google credentials from file")
+            except Exception as e:
+                print(f"⚠️  Could not load credentials from file: {e}")
+        else:
+            print(f"⚠️  Credentials path does not exist: {GOOGLE_APPLICATION_CREDENTIALS}")
+    except Exception as e:
+        print(f"⚠️  Error parsing credentials: {e}")
+
+# Try default file path if credentials not loaded yet
+if credentials is None and os.path.exists("google_credentials.json"):
+    try:
+        import json
+        with open("google_credentials.json", 'r') as f:
             creds_data = json.load(f)
-            PROJECT_ID = creds_data.get('project_id') or os.getenv("GOOGLE_CLOUD_PROJECT_ID")
-        
+        credentials = service_account.Credentials.from_service_account_file("google_credentials.json")
+        print("✅ Loaded Google credentials from default file")
+    except Exception as e:
+        print(f"⚠️  Could not load default credentials file: {e}")
+
+# Initialize Vertex AI if we have credentials
+if credentials and creds_data:
+    try:
+        PROJECT_ID = PROJECT_ID or creds_data.get('project_id')
         if not PROJECT_ID:
-            raise ValueError("project_id not found in credentials file and GOOGLE_CLOUD_PROJECT_ID not set")
+            raise ValueError("project_id not found in credentials and GOOGLE_CLOUD_PROJECT_ID not set")
         
-        credentials = service_account.Credentials.from_service_account_file(
-            GOOGLE_APPLICATION_CREDENTIALS
-        )
         vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=credentials)
         model = GenerativeModel("gemini-2.0-flash-exp")
         print(f"✅ Vertex AI initialized (Project: {PROJECT_ID})")
@@ -68,7 +107,8 @@ if os.path.exists(GOOGLE_APPLICATION_CREDENTIALS):
         print(f"⚠️  Warning: Could not initialize Vertex AI: {e}")
         print("   API endpoints will return errors until credentials are configured")
 else:
-    print("⚠️  Warning: Google credentials file not found")
+    print("⚠️  Warning: Google credentials not found")
+    print("   Set GOOGLE_APPLICATION_CREDENTIALS as JSON string (Vercel) or file path (local)")
     print("   API endpoints will return errors until credentials are configured")
 
 # Turso connection (optional for now)
