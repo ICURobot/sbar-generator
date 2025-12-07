@@ -164,11 +164,16 @@ def get_embedding(text: str) -> np.ndarray:
     except KeyError as e:
         raise Exception(f"Unexpected API response format: {e}")
 
-def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+def search_turso_knowledge(query: str, top_k: int = 5, book_title_filter: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Search Turso database for relevant knowledge chunks.
     Returns list of chunks with their text and metadata.
     Uses Google AI Studio API for embeddings (matches embeddings stored in Turso).
+    
+    Args:
+        query: Search query text
+        top_k: Number of top results to return
+        book_title_filter: Optional book title to filter results (e.g., "Lehne's Pharmacology for Nursing Care ( PDFDrive.com )")
     """
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         return []  # Return empty if Turso not configured
@@ -184,11 +189,12 @@ def search_turso_knowledge(query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         print(f"⚠️  Error generating embedding: {e}")
         return []  # Return empty if embedding generation fails
     
-    # Get all chunks from database
-    # Note: Turso doesn't have native vector similarity search, so we'll do it in memory
-    # For production, consider using a dedicated vector DB or implementing approximate search
+    # Get chunks from database, optionally filtered by book title
     cursor = client.cursor()
-    cursor.execute("SELECT id, chunk_text, embedding, page_number, book_title FROM medical_knowledge")
+    if book_title_filter:
+        cursor.execute("SELECT id, chunk_text, embedding, page_number, book_title FROM medical_knowledge WHERE book_title = ?", (book_title_filter,))
+    else:
+        cursor.execute("SELECT id, chunk_text, embedding, page_number, book_title FROM medical_knowledge")
     rows = cursor.fetchall()
     
     if not rows:
@@ -322,8 +328,12 @@ async def generate_sbar(request: GenerateSBARRequest):
         drips = patient_data.get("drips", "")
         medications = patient_data.get("medications", "")
         
+        # Lehne's Pharmacology book title (exact match from database)
+        lehne_book_title = "Lehne's Pharmacology for Nursing Care ( PDFDrive.com )"
+        
         # Perform multiple searches to get comprehensive knowledge base coverage
         all_chunks = []
+        pharmacology_chunks = []  # Separate list for pharmacology-specific chunks
         seen_chunk_ids = set()
         
         # Search 1: Primary diagnosis
@@ -352,7 +362,50 @@ async def generate_sbar(request: GenerateSBARRequest):
                     all_chunks.append(chunk)
                     seen_chunk_ids.add(chunk['id'])
         
-        # Search 4: General ICU care guidelines if we don't have enough chunks
+        # Search 4: Pharmacology-specific searches from Lehne's Pharmacology book
+        # Extract medication names and search for each in Lehne's
+        if medications or drips:
+            # Combine medications and drips for comprehensive search
+            all_meds_text = f"{medications} {drips}".strip()
+            
+            # Search for general pharmacology information related to diagnosis
+            if diagnosis:
+                pharm_query = f"{diagnosis} pharmacology drug therapy medication"
+                chunks = search_turso_knowledge(pharm_query, top_k=5, book_title_filter=lehne_book_title)
+                for chunk in chunks:
+                    if chunk['id'] not in seen_chunk_ids:
+                        pharmacology_chunks.append(chunk)
+                        seen_chunk_ids.add(chunk['id'])
+            
+            # Search for specific medications/drips mentioned
+            # Try to extract individual medication names (common ICU meds)
+            common_meds = ["levophed", "norepinephrine", "epinephrine", "dopamine", "dobutamine", 
+                          "propofol", "fentanyl", "morphine", "versed", "midazolam",
+                          "vancomycin", "piperacillin", "tazobactam", "cefepime", "meropenem",
+                          "heparin", "warfarin", "aspirin", "clopidogrel",
+                          "insulin", "dextrose", "sodium chloride", "potassium",
+                          "amiodarone", "lidocaine", "atropine", "epinephrine",
+                          "albuterol", "ipratropium", "budesonide", "prednisone"]
+            
+            for med in common_meds:
+                if med.lower() in all_meds_text.lower():
+                    med_query = f"{med} pharmacology dosing administration nursing considerations"
+                    chunks = search_turso_knowledge(med_query, top_k=3, book_title_filter=lehne_book_title)
+                    for chunk in chunks:
+                        if chunk['id'] not in seen_chunk_ids:
+                            pharmacology_chunks.append(chunk)
+                            seen_chunk_ids.add(chunk['id'])
+            
+            # Also do a general search on the medications text
+            if all_meds_text:
+                general_pharm_query = f"{all_meds_text} pharmacology nursing care"
+                chunks = search_turso_knowledge(general_pharm_query, top_k=5, book_title_filter=lehne_book_title)
+                for chunk in chunks:
+                    if chunk['id'] not in seen_chunk_ids:
+                        pharmacology_chunks.append(chunk)
+                        seen_chunk_ids.add(chunk['id'])
+        
+        # Search 5: General ICU care guidelines if we don't have enough chunks
         if len(all_chunks) < 5:
             chunks = search_turso_knowledge("ICU patient care guidelines protocols", top_k=5)
             for chunk in chunks:
@@ -364,6 +417,10 @@ async def generate_sbar(request: GenerateSBARRequest):
         all_chunks.sort(key=lambda x: x['similarity'], reverse=True)
         relevant_chunks = all_chunks[:10]  # Use top 10 most relevant chunks
         
+        # Sort pharmacology chunks by similarity
+        pharmacology_chunks.sort(key=lambda x: x['similarity'], reverse=True)
+        top_pharmacology_chunks = pharmacology_chunks[:8]  # Use top 8 pharmacology chunks
+        
         # Build context from relevant chunks with clear source attribution
         context_parts = []
         for i, chunk in enumerate(relevant_chunks, 1):
@@ -374,11 +431,23 @@ async def generate_sbar(request: GenerateSBARRequest):
         
         guidelines_context = "\n\n---\n\n".join(context_parts) if context_parts else "No specific guidelines found for this diagnosis."
         
+        # Build separate pharmacology context from Lehne's Pharmacology
+        pharmacology_context_parts = []
+        for i, chunk in enumerate(top_pharmacology_chunks, 1):
+            page_info = f" (Page {chunk['page_number']})" if chunk['page_number'] else ""
+            similarity = f" [Relevance: {chunk['similarity']:.2f}]" if chunk.get('similarity') else ""
+            pharmacology_context_parts.append(f"[Pharmacology Source {i} - Lehne's Pharmacology{page_info}{similarity}]\n{chunk['text']}")
+        
+        pharmacology_context = "\n\n---\n\n".join(pharmacology_context_parts) if pharmacology_context_parts else "No specific pharmacology information found for the medications/drips listed."
+        
         # Build comprehensive prompt for Gemini
-        prompt = f"""You are a multi-persona AI assistant for ICU nurses, grounded by authoritative clinical data from an ICU textbook. Generate a professional SBAR (Situation, Background, Assessment, Recommendation) handoff report as a JSON object with keys: "situation", "background", "assessment", "recommendation", and "ai_suggestion".
+        prompt = f"""You are a multi-persona AI assistant for ICU nurses, grounded by authoritative clinical data from ICU textbooks including Lehne's Pharmacology for Nursing Care. Generate a professional SBAR (Situation, Background, Assessment, Recommendation) handoff report as a JSON object with keys: "situation", "background", "assessment", "recommendation", and "ai_suggestion".
 
-RELEVANT CLINICAL GUIDELINES FROM TEXTBOOK:
+RELEVANT CLINICAL GUIDELINES FROM TEXTBOOKS:
 {guidelines_context}
+
+PHARMACOLOGY INFORMATION FROM LEHNE'S PHARMACOLOGY FOR NURSING CARE:
+{pharmacology_context}
 
 PATIENT DATA:
 {patient_data}
@@ -386,16 +455,17 @@ PATIENT DATA:
 INSTRUCTIONS FOR EACH SECTION:
 1. "situation": Concise summary of current patient status and immediate concerns
 2. "background": Patient history, diagnosis, and relevant past medical information
-3. "assessment": System-by-system assessment (Neurological, Cardiovascular, Respiratory, GI/GU, etc.) based on the provided data
-4. "recommendation": **CRITICAL: This section MUST be directly based on the RELEVANT CLINICAL GUIDELINES FROM TEXTBOOK above.** Act as an experienced ICU Charge Nurse. Review the textbook guidelines and extract specific, actionable recommendations that apply to this patient's condition. Structure your recommendations by priority (immediate, short-term, ongoing) and reference the relevant guidelines. Include specific monitoring parameters, intervention thresholds, and care protocols from the textbook that are applicable to this patient. If the guidelines mention specific protocols, medications, or interventions for this diagnosis/condition, incorporate them into your recommendations.
-5. "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations informed by the textbook guidelines above. Structure by system.
+3. "assessment": System-by-system assessment (Neurological, Cardiovascular, Respiratory, GI/GU, etc.) based on the provided data. **CRITICAL: Include a dedicated "Pharmacology Assessment" subsection that analyzes the patient's medications and drips using information from Lehne's Pharmacology. Address: drug indications, expected therapeutic effects, potential adverse effects, drug interactions, monitoring requirements, and nursing considerations for each medication/drip listed.**
+4. "recommendation": **CRITICAL: This section MUST be directly based on the RELEVANT CLINICAL GUIDELINES FROM TEXTBOOKS above AND the PHARMACOLOGY INFORMATION FROM LEHNE'S.** Act as an experienced ICU Charge Nurse. Review both the clinical guidelines and pharmacology information, then extract specific, actionable recommendations that apply to this patient's condition. Structure your recommendations by priority (immediate, short-term, ongoing) and reference the relevant sources. Include specific monitoring parameters, intervention thresholds, and care protocols from the textbooks. **MUST include pharmacology-specific recommendations such as: medication dosing adjustments, monitoring for drug effects/adverse reactions, drug interaction precautions, administration considerations, and when to notify the physician based on Lehne's Pharmacology guidelines.**
+5. "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations informed by the textbook guidelines and pharmacology information above. Structure by system. **Include pharmacology considerations: review medication appropriateness, potential drug interactions, dosing optimization, and monitoring needs based on Lehne's Pharmacology.**
 
 CRITICAL SAFETY CHECK: Review the patient's listed allergies against all medications mentioned. If there is a potential conflict, state this as the VERY FIRST point in "ai_suggestion" preceded with "!!! CRITICAL SAFETY ALERT:".
 
 IMPORTANT: 
-- **The "recommendation" section is the MOST CRITICAL and MUST be grounded in the textbook guidelines above. Do not provide generic recommendations - extract specific protocols, monitoring requirements, and interventions from the textbook sources.**
-- Use the clinical guidelines from the textbook to inform ALL sections, but especially the "recommendation" section
-- Be specific and actionable - cite specific parameters, thresholds, or protocols from the textbook when applicable
+- **The "assessment" section MUST include a "Pharmacology Assessment" subsection using Lehne's Pharmacology information**
+- **The "recommendation" section is the MOST CRITICAL and MUST be grounded in BOTH the clinical guidelines AND pharmacology information from Lehne's. Do not provide generic recommendations - extract specific protocols, monitoring requirements, interventions, and medication management guidance from the textbook sources.**
+- Use the clinical guidelines and pharmacology information to inform ALL sections, but especially the "assessment" and "recommendation" sections
+- Be specific and actionable - cite specific parameters, thresholds, protocols, dosing ranges, or monitoring requirements from the textbooks when applicable
 - Maintain professional medical terminology
 - If the textbook guidelines don't contain relevant information for a specific aspect, you may use your clinical knowledge, but prioritize textbook guidance
 - Conclude "ai_suggestion" with: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
@@ -419,13 +489,42 @@ Generate the JSON object now. Return ONLY valid JSON, no markdown formatting.
                 text = text.split("```")[1].split("```")[0].strip()
             report_json = json.loads(text)
         
-        # Ensure all required keys exist
+        # Ensure all required keys exist and convert nested structures to strings
         required_keys = ["situation", "background", "assessment", "recommendation", "ai_suggestion"]
-        for key in required_keys:
-            if key not in report_json:
-                report_json[key] = ""
         
-        return GenerateSBARResponse(report=report_json)
+        def convert_to_string(value):
+            """Convert nested dictionaries/lists to formatted string."""
+            if isinstance(value, str):
+                return value
+            elif isinstance(value, dict):
+                # Format dictionary as a readable string
+                lines = []
+                for k, v in value.items():
+                    if isinstance(v, list):
+                        lines.append(f"{k}:")
+                        for item in v:
+                            lines.append(f"  • {item}")
+                    elif isinstance(v, dict):
+                        lines.append(f"{k}:")
+                        for sub_k, sub_v in v.items():
+                            lines.append(f"  • {sub_k}: {sub_v}")
+                    else:
+                        lines.append(f"{k}: {v}")
+                return "\n".join(lines)
+            elif isinstance(value, list):
+                return "\n".join([f"• {item}" for item in value])
+            else:
+                return str(value)
+        
+        # Convert all values to strings
+        final_report = {}
+        for key in required_keys:
+            if key in report_json:
+                final_report[key] = convert_to_string(report_json[key])
+            else:
+                final_report[key] = ""
+        
+        return GenerateSBARResponse(report=final_report)
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating SBAR report: {str(e)}")
