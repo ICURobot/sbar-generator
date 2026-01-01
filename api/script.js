@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const processReportBtn = document.getElementById('process-report-btn');
     const processBtnText = document.getElementById('process-btn-text');
     const processLoading = document.getElementById('process-loading');
-    
+
     // Tab elements
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('disclaimerShownDate', today);
     });
     checkPrivacyDisclaimer();
-    
+
     // Auto-Save and Load Logic (using localStorage instead of backend)
     async function saveDraft() {
         const formData = collectFormData();
@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) { console.error("Could not load draft:", error); }
     }
-    
+
     function populateForm(formData) {
         for (const key in formData) {
             const element = document.getElementById(key);
@@ -81,11 +81,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     form.addEventListener('input', () => {
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(saveDraft, 2000); 
+        saveTimeout = setTimeout(saveDraft, 2000);
     });
-    
+
     clearFormBtn.addEventListener('click', () => {
-        if(confirm('Are you sure you want to clear the entire form? This cannot be undone.')) {
+        if (confirm('Are you sure you want to clear the entire form? This cannot be undone.')) {
             form.querySelectorAll('input, textarea').forEach(el => el.value = '');
             saveDraft();
         }
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reportCaptureContainer.classList.remove('hidden');
         loadDraft();
     }
-    
+
     // Initialize on page load
     updateLoginState();
 
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const targetTab = btn.dataset.tab;
-            
+
             // Update active tab
             tabButtons.forEach(b => {
                 b.classList.remove('border-blue-500', 'text-blue-600');
@@ -117,11 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             btn.classList.add('border-blue-500', 'text-blue-600');
             btn.classList.remove('text-gray-600');
-            
+
             // Show/hide panels
             tabPanels.forEach(panel => panel.classList.add('hidden'));
             document.getElementById(`panel-${targetTab}`).classList.remove('hidden');
-            
+
             // Update process button state
             updateProcessButtonState();
         });
@@ -131,14 +131,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateProcessButtonState() {
         const activeTab = document.querySelector('.tab-btn.border-blue-500')?.dataset.tab;
         let hasContent = false;
-        
+
         if (activeTab === 'voice' || activeTab === 'text') {
             const textValue = activeTab === 'voice' ? transcriptBox.value.trim() : textInputBox.value.trim();
             hasContent = textValue.length > 0;
         } else if (activeTab === 'image') {
             hasContent = imageInput.files && imageInput.files.length > 0;
         }
-        
+
         processReportBtn.disabled = !hasContent;
     }
 
@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         recognition = new webkitSpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'en-CA'; 
+        recognition.lang = 'en-CA';
 
         recognition.onstart = () => {
             isRecording = true;
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isRecording) {
                 recognition.stop();
             } else {
-                transcriptBox.value = ''; 
+                transcriptBox.value = '';
                 recognition.start();
             }
         });
@@ -197,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Image upload handling
     selectImageBtn.addEventListener('click', () => imageInput.click());
-    
+
     imageInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             captureStatus.textContent = '✅ Form filled successfully!';
             captureStatus.classList.remove('text-red-500');
             captureStatus.classList.add('text-green-600');
-            
+
             setTimeout(() => {
                 captureStatus.textContent = '';
                 captureStatus.classList.remove('text-green-600');
@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleGenerateSbar() {
-        await saveDraft(); 
+        await saveDraft();
         const formData = collectFormData();
         if (Object.keys(formData).length === 0) {
             alert("Please fill out some patient information first.");
@@ -305,13 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         openModal();
         reportContentContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-full"><div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-24 w-24 mb-4"></div><p class="text-lg font-semibold text-gray-600">Generating report...</p></div>`;
-        
+
         try {
             // Call FastAPI backend
             const response = await fetch('/generate_sbar', {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },
@@ -322,14 +322,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const result = await response.json();
-            lastReportJson = result.report; 
+            lastReportJson = result.report;
             renderReport(lastReportJson);
         } catch (error) {
             // This will now only catch network errors or other unexpected issues
             reportContentContainer.innerHTML = `<div class="p-6"><p class="text-red-500 font-semibold">A network error occurred: ${error.message}.</p></div>`;
         }
     }
-    
+
     function renderReport(report) {
         const sectionColors = {
             situation: 'bg-blue-50 border-blue-200 text-blue-800',
@@ -355,8 +355,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let plainText = '';
         for (const key in lastReportJson) {
             if (Object.hasOwnProperty.call(lastReportJson, key) && lastReportJson[key]) {
-                 const title = key === 'ai_suggestion' ? '**AI Suggestion**' : `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
-                 plainText += `${title}\n${lastReportJson[key]}\n\n`;
+                const title = key === 'ai_suggestion' ? '**AI Suggestion**' : `**${key.charAt(0).toUpperCase() + key.slice(1)}**`;
+                plainText += `${title}\n${lastReportJson[key]}\n\n`;
             }
         }
         const tempTextArea = document.createElement('textarea');
@@ -439,10 +439,65 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function simpleMarkdown(text) {
+        // 1. Handle lists (lines starting with * or -)
+        let lines = text.split('\n');
+        let inList = false;
+        let html = '';
+
+        lines.forEach(line => {
+            if (line.trim().match(/^[\*\-]\s/)) {
+                if (!inList) {
+                    html += '<ul class="list-disc ml-4 mb-2">';
+                    inList = true;
+                }
+                html += `<li>${line.trim().substring(2)}</li>`;
+            } else {
+                if (inList) {
+                    html += '</ul>';
+                    inList = false;
+                }
+                html += line + (line.trim() ? '<br>' : '');
+            }
+        });
+        if (inList) html += '</ul>';
+
+        // 2. Bold (**text**)
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-gray-900">$1</strong>');
+
+        // 3. Headers (### text)
+        html = html.replace(/###\s(.*?)(<br>|$)/g, '<h3 class="font-bold text-lg mt-3 mb-1">$1</h3>');
+
+        return html;
+    }
+
     function addChatMessage(text, isUser = false) {
         const messageDiv = document.createElement('div');
-        messageDiv.className = `p-3 rounded-lg mb-3 ${isUser ? 'bg-blue-500 text-white ml-12' : 'bg-gray-100 text-gray-800 mr-12'}`;
-        messageDiv.textContent = text;
+        messageDiv.className = `p-3 rounded-lg mb-3 ${isUser ? 'bg-blue-600 text-white ml-12' : 'bg-white text-gray-800 mr-12 shadow-sm border border-gray-100'}`;
+
+        if (isUser) {
+            messageDiv.textContent = text;
+        } else {
+            // Try marked.js first, then fallback to simple parser
+            try {
+                if (typeof marked !== 'undefined') {
+                    messageDiv.innerHTML = marked.parse(text);
+                    // Add styling to marked output
+                    messageDiv.querySelectorAll('ul').forEach(el => el.classList.add('list-disc', 'ml-4', 'mb-2'));
+                    messageDiv.querySelectorAll('ol').forEach(el => el.classList.add('list-decimal', 'ml-4', 'mb-2'));
+                    messageDiv.querySelectorAll('p').forEach(el => el.classList.add('mb-2', 'last:mb-0'));
+                    messageDiv.querySelectorAll('strong').forEach(el => el.classList.add('font-bold', 'text-gray-900'));
+                    messageDiv.querySelectorAll('h3').forEach(el => el.classList.add('font-bold', 'text-lg', 'mt-3', 'mb-1'));
+                    messageDiv.querySelectorAll('a').forEach(el => el.classList.add('text-blue-600', 'underline'));
+                } else {
+                    throw new Error("marked is undefined");
+                }
+            } catch (e) {
+                console.warn("Markdown rendering failed, using fallback:", e);
+                messageDiv.innerHTML = simpleMarkdown(text);
+            }
+        }
+
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -461,7 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/chat', {
                 method: 'POST',
                 mode: 'cors',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Accept': 'application/json'
                 },

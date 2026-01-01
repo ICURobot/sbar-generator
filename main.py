@@ -269,28 +269,54 @@ async def chat(request: ChatRequest):
     if model is None:
         raise HTTPException(status_code=503, detail="Vertex AI not configured. Please set up Google Cloud credentials.")
     try:
+        # Check for specific book requests in the query
+        book_filter = None
+        query_lower = request.question.lower()
+        
+        if "critical care nursing" in query_lower or "urden" in query_lower or "icu nursing book" in query_lower:
+            book_filter = "Critical Care Nursing, Diagnosis and Management - Urden, Linda D"
+        elif "acls" in query_lower:
+            book_filter = "Advanced Cardiac Life Support Provider Handbook 2015-2020 ( PDFDrive )"
+        elif "lehne" in query_lower or "pharmacology" in query_lower:
+            book_filter = "Lehne’s Pharmacology for Nursing Care ( PDFDrive.com )"
+        elif "tncc" in query_lower or "trauma" in query_lower:
+            book_filter = "TNCC 8th Edition"
+        elif "marino" in query_lower or "icu physician" in query_lower:
+            book_filter = "MarinoICUphysician"
+        elif "canadian" in query_lower or "lab" in query_lower:
+            book_filter = "Canadian Lab Test Manual"
+
         # Search for relevant knowledge
-        relevant_chunks = search_turso_knowledge(request.question, top_k=5)
+        # Increase top_k to 15 to ensure we get a broader context
+        relevant_chunks = search_turso_knowledge(request.question, top_k=15, book_title_filter=book_filter)
         
         # Build context from relevant chunks
         context_parts = []
         for i, chunk in enumerate(relevant_chunks, 1):
             page_info = f" (Page {chunk['page_number']})" if chunk['page_number'] else ""
-            context_parts.append(f"[Source {i}{page_info}]\n{chunk['text']}\n")
+            book_info = f" [Book: {chunk.get('book_title', 'Unknown')}]"
+            context_parts.append(f"[Source {i}{book_info}{page_info}]\n{chunk['text']}\n")
         
         context = "\n---\n".join(context_parts)
         
         # Build prompt for Gemini
         prompt = f"""You are an AI assistant helping ICU nurses with questions about critical care medicine.
-
-Use the following knowledge from an authoritative ICU textbook to answer the question. If the knowledge doesn't contain the answer, say so clearly.
+        
+Use the following knowledge from authoritative ICU textbooks to answer the question.
 
 KNOWLEDGE BASE:
 {context}
 
 QUESTION: {request.question}
 
-Provide a clear, concise, and clinically accurate answer. Cite which source(s) you used if applicable.
+INSTRUCTIONS:
+1. Provide a clear, concise, and clinically accurate answer based on the KNOWLEDGE BASE.
+2. If the text contains specific values, Normal Ranges, or drug dosages, PROVIDE THEM EXPLICITLY.
+3. If the sources contain disclaimers about "checking local labs" or "variability", you should mention the disclaimer BUT STILL PROVIDE the values found in the text (e.g., "The text lists the range as X-Y, noting that local labs may vary").
+4. Do NOT refuse to answer because of a general disclaimer if the data is present in the chunks.
+5. If the knowledge doesn't contain the answer at all, say so clearly.
+
+Cite which source(s) and book(s) you used.
 """
         
         # Generate response using Gemini 2.0
@@ -302,6 +328,7 @@ Provide a clear, concise, and clinically accurate answer. Cite which source(s) y
             {
                 "text": chunk['text'][:200] + "..." if len(chunk['text']) > 200 else chunk['text'],
                 "page_number": chunk['page_number'],
+                "book_title": chunk.get('book_title', 'Unknown'),
                 "similarity": round(float(chunk['similarity']), 3)  # Ensure it's a Python float
             }
             for chunk in relevant_chunks
@@ -328,149 +355,130 @@ async def generate_sbar(request: GenerateSBARRequest):
         drips = patient_data.get("drips", "")
         medications = patient_data.get("medications", "")
         
-        # Lehne's Pharmacology book title (exact match from database)
-        lehne_book_title = "Lehne's Pharmacology for Nursing Care ( PDFDrive.com )"
+        # Book Titles
+        lehne_book = "Lehne’s Pharmacology for Nursing Care ( PDFDrive.com )"
+        canadian_book = "Canadian Lab Test Manual"
+        marino_book = "MarinoICUphysician"
+        urden_book = "Critical Care Nursing, Diagnosis and Management - Urden, Linda D"
         
-        # Perform multiple searches to get comprehensive knowledge base coverage
-        all_chunks = []
-        pharmacology_chunks = []  # Separate list for pharmacology-specific chunks
-        seen_chunk_ids = set()
+        # Repositories for chunks
+        lab_chunks = []
+        pharm_chunks = []
+        general_chunks = []
+        seen_ids = set()
         
-        # Search 1: Primary diagnosis
-        if diagnosis:
-            chunks = search_turso_knowledge(diagnosis, top_k=8)
-            for chunk in chunks:
-                if chunk['id'] not in seen_chunk_ids:
-                    all_chunks.append(chunk)
-                    seen_chunk_ids.add(chunk['id'])
+        # --- 1. LABS & DIAGNOSTICS SEARCH ---
+        # Primary: Canadian Lab Test Manual
+        lab_query = f"{diagnosis} lab tests monitoring diagnostics" if diagnosis else "ICU lab tests diagnostics monitoring"
+        chunks = search_turso_knowledge(lab_query, top_k=10, book_title_filter=canadian_book)
+        for c in chunks:
+            if c['id'] not in seen_ids:
+                lab_chunks.append(c)
+                seen_ids.add(c['id'])
+                
+        # Secondary: Marino & Urden
+        for book in [marino_book, urden_book]:
+            chunks = search_turso_knowledge(lab_query, top_k=5, book_title_filter=book)
+            for c in chunks:
+                if c['id'] not in seen_ids:
+                    lab_chunks.append(c)
+                    seen_ids.add(c['id'])
+
+        # --- 2. PHARMACOLOGY & DRIPS SEARCH ---
+        # Combine meds/drips text
+        all_meds_text = f"{medications} {drips}".strip()
+        med_query_base = f"{diagnosis} pharmacology medication management" if diagnosis else "ICU pharmacology medication management"
         
-        # Search 2: Ventilator/Respiratory management if applicable
-        if vent_settings or patient_data.get("o2-delivery"):
-            resp_query = f"{diagnosis} ventilator management respiratory care" if diagnosis else "ventilator management respiratory care"
-            chunks = search_turso_knowledge(resp_query, top_k=5)
-            for chunk in chunks:
-                if chunk['id'] not in seen_chunk_ids:
-                    all_chunks.append(chunk)
-                    seen_chunk_ids.add(chunk['id'])
+        # Primary: Lehne's
+        chunks = search_turso_knowledge(med_query_base, top_k=10, book_title_filter=lehne_book)
+        for c in chunks:
+            if c['id'] not in seen_ids:
+                pharm_chunks.append(c)
+                seen_ids.add(c['id'])
         
-        # Search 3: Medication/drip management if applicable
-        if drips or medications:
-            med_query = f"{diagnosis} medication management drips" if diagnosis else "ICU medication management drips"
-            chunks = search_turso_knowledge(med_query, top_k=5)
-            for chunk in chunks:
-                if chunk['id'] not in seen_chunk_ids:
-                    all_chunks.append(chunk)
-                    seen_chunk_ids.add(chunk['id'])
-        
-        # Search 4: Pharmacology-specific searches from Lehne's Pharmacology book
-        # Extract medication names and search for each in Lehne's
-        if medications or drips:
-            # Combine medications and drips for comprehensive search
-            all_meds_text = f"{medications} {drips}".strip()
-            
-            # Search for general pharmacology information related to diagnosis
-            if diagnosis:
-                pharm_query = f"{diagnosis} pharmacology drug therapy medication"
-                chunks = search_turso_knowledge(pharm_query, top_k=5, book_title_filter=lehne_book_title)
-                for chunk in chunks:
-                    if chunk['id'] not in seen_chunk_ids:
-                        pharmacology_chunks.append(chunk)
-                        seen_chunk_ids.add(chunk['id'])
-            
-            # Search for specific medications/drips mentioned
-            # Try to extract individual medication names (common ICU meds)
-            common_meds = ["levophed", "norepinephrine", "epinephrine", "dopamine", "dobutamine", 
-                          "propofol", "fentanyl", "morphine", "versed", "midazolam",
-                          "vancomycin", "piperacillin", "tazobactam", "cefepime", "meropenem",
-                          "heparin", "warfarin", "aspirin", "clopidogrel",
-                          "insulin", "dextrose", "sodium chloride", "potassium",
-                          "amiodarone", "lidocaine", "atropine", "epinephrine",
-                          "albuterol", "ipratropium", "budesonide", "prednisone"]
-            
-            for med in common_meds:
-                if med.lower() in all_meds_text.lower():
-                    med_query = f"{med} pharmacology dosing administration nursing considerations"
-                    chunks = search_turso_knowledge(med_query, top_k=3, book_title_filter=lehne_book_title)
-                    for chunk in chunks:
-                        if chunk['id'] not in seen_chunk_ids:
-                            pharmacology_chunks.append(chunk)
-                            seen_chunk_ids.add(chunk['id'])
-            
-            # Also do a general search on the medications text
-            if all_meds_text:
-                general_pharm_query = f"{all_meds_text} pharmacology nursing care"
-                chunks = search_turso_knowledge(general_pharm_query, top_k=5, book_title_filter=lehne_book_title)
-                for chunk in chunks:
-                    if chunk['id'] not in seen_chunk_ids:
-                        pharmacology_chunks.append(chunk)
-                        seen_chunk_ids.add(chunk['id'])
-        
-        # Search 5: General ICU care guidelines if we don't have enough chunks
-        if len(all_chunks) < 5:
-            chunks = search_turso_knowledge("ICU patient care guidelines protocols", top_k=5)
-            for chunk in chunks:
-                if chunk['id'] not in seen_chunk_ids:
-                    all_chunks.append(chunk)
-                    seen_chunk_ids.add(chunk['id'])
-        
-        # Sort by similarity and take top chunks
-        all_chunks.sort(key=lambda x: x['similarity'], reverse=True)
-        relevant_chunks = all_chunks[:10]  # Use top 10 most relevant chunks
-        
-        # Sort pharmacology chunks by similarity
-        pharmacology_chunks.sort(key=lambda x: x['similarity'], reverse=True)
-        top_pharmacology_chunks = pharmacology_chunks[:8]  # Use top 8 pharmacology chunks
-        
-        # Build context from relevant chunks with clear source attribution
-        context_parts = []
-        for i, chunk in enumerate(relevant_chunks, 1):
-            page_info = f" (Page {chunk['page_number']})" if chunk['page_number'] else ""
-            book_info = f" [From: {chunk.get('book_title', 'Unknown')}]" if chunk.get('book_title') else ""
-            similarity = f" [Relevance: {chunk['similarity']:.2f}]" if chunk.get('similarity') else ""
-            context_parts.append(f"[Source {i}{book_info}{page_info}{similarity}]\n{chunk['text']}")
-        
-        guidelines_context = "\n\n---\n\n".join(context_parts) if context_parts else "No specific guidelines found for this diagnosis."
-        
-        # Build separate pharmacology context from Lehne's Pharmacology
-        pharmacology_context_parts = []
-        for i, chunk in enumerate(top_pharmacology_chunks, 1):
-            page_info = f" (Page {chunk['page_number']})" if chunk['page_number'] else ""
-            similarity = f" [Relevance: {chunk['similarity']:.2f}]" if chunk.get('similarity') else ""
-            pharmacology_context_parts.append(f"[Pharmacology Source {i} - Lehne's Pharmacology{page_info}{similarity}]\n{chunk['text']}")
-        
-        pharmacology_context = "\n\n---\n\n".join(pharmacology_context_parts) if pharmacology_context_parts else "No specific pharmacology information found for the medications/drips listed."
+        # Search specifically for mentioned meds in Lehne's
+        if all_meds_text:
+            med_specific_query = f"{all_meds_text} dosing interactions monitoring"
+            chunks = search_turso_knowledge(med_specific_query, top_k=8, book_title_filter=lehne_book)
+            for c in chunks:
+                if c['id'] not in seen_ids:
+                    pharm_chunks.append(c)
+                    seen_ids.add(c['id'])
+                    
+        # Secondary: Marino & Urden (for clinical context of these meds)
+        for book in [marino_book, urden_book]:
+            chunks = search_turso_knowledge(med_query_base, top_k=5, book_title_filter=book)
+            for c in chunks:
+                if c['id'] not in seen_ids:
+                    pharm_chunks.append(c)
+                    seen_ids.add(c['id'])
+
+        # --- 3. GENERAL CLINICAL CONTEXT (Diagnosis/Vents) ---
+        # Search Urden & Marino text for general care
+        clinical_query = f"{diagnosis} nursing care management intervention" if diagnosis else "ICU nursing care management"
+        for book in [urden_book, marino_book]:
+            chunks = search_turso_knowledge(clinical_query, top_k=8, book_title_filter=book)
+            for c in chunks:
+                if c['id'] not in seen_ids:
+                    general_chunks.append(c)
+                    seen_ids.add(c['id'])
+                    
+        # Ventilator search if needed
+        if vent_settings:
+            vent_query = "ventilator management mechanical ventilation"
+            chunks = search_turso_knowledge(vent_query, top_k=5) # Search all books for vent
+            for c in chunks:
+                if c['id'] not in seen_ids:
+                    general_chunks.append(c)
+                    seen_ids.add(c['id'])
+
+        # --- BUILD CONTEXT STRINGS ---
+        def format_chunks(chunk_list, section_name):
+            if not chunk_list:
+                return f"No specific {section_name} information found."
+            parts = []
+            # Sort by similarity
+            chunk_list.sort(key=lambda x: x['similarity'], reverse=True)
+            for i, c in enumerate(chunk_list[:15], 1): # Top 15 per section
+                parts.append(f"[{section_name} Source {i} - {c.get('book_title', 'Unknown')} (Page {c.get('page_number', '?')})]\n{c['text']}")
+            return "\n\n".join(parts)
+
+        lab_context = format_chunks(lab_chunks, "LABS_DIAGNOSTICS")
+        pharm_context = format_chunks(pharm_chunks, "PHARMACOLOGY")
+        general_context = format_chunks(general_chunks, "CLINICAL_GUIDELINES")
         
         # Build comprehensive prompt for Gemini
-        prompt = f"""You are a multi-persona AI assistant for ICU nurses, grounded by authoritative clinical data from ICU textbooks including Lehne's Pharmacology for Nursing Care. Generate a professional SBAR (Situation, Background, Assessment, Recommendation) handoff report as a JSON object with keys: "situation", "background", "assessment", "recommendation", and "ai_suggestion".
+        prompt = f"""You are a multi-persona AI assistant for ICU nurses. Generate a professional SBAR output.
 
-RELEVANT CLINICAL GUIDELINES FROM TEXTBOOKS:
-{guidelines_context}
+SOURCES TO USE:
+1. LABS & DIAGNOSTICS KNOWLEDGE (Primary: Canadian Lab Manual, Secondary: Marino/Urden):
+{lab_context}
 
-PHARMACOLOGY INFORMATION FROM LEHNE'S PHARMACOLOGY FOR NURSING CARE:
-{pharmacology_context}
+2. PHARMACOLOGY KNOWLEDGE (Primary: Lehne's, Secondary: Marino/Urden):
+{pharm_context}
+
+3. GENERAL CLINICAL GUIDELINES (Marino/Urden):
+{general_context}
 
 PATIENT DATA:
 {patient_data}
 
-INSTRUCTIONS FOR EACH SECTION:
-1. "situation": Concise summary of current patient status and immediate concerns
-2. "background": Patient history, diagnosis, and relevant past medical information
-3. "assessment": System-by-system assessment (Neurological, Cardiovascular, Respiratory, GI/GU, etc.) based on the provided data. **CRITICAL: Include a dedicated "Pharmacology Assessment" subsection that analyzes the patient's medications and drips using information from Lehne's Pharmacology. Address: drug indications, expected therapeutic effects, potential adverse effects, drug interactions, monitoring requirements, and nursing considerations for each medication/drip listed.**
-4. "recommendation": **CRITICAL: This section MUST be directly based on the RELEVANT CLINICAL GUIDELINES FROM TEXTBOOKS above AND the PHARMACOLOGY INFORMATION FROM LEHNE'S.** Act as an experienced ICU Charge Nurse. Review both the clinical guidelines and pharmacology information, then extract specific, actionable recommendations that apply to this patient's condition. Structure your recommendations by priority (immediate, short-term, ongoing) and reference the relevant sources. Include specific monitoring parameters, intervention thresholds, and care protocols from the textbooks. **MUST include pharmacology-specific recommendations such as: medication dosing adjustments, monitoring for drug effects/adverse reactions, drug interaction precautions, administration considerations, and when to notify the physician based on Lehne's Pharmacology guidelines.**
-5. "ai_suggestion": Act as an ICU Staff Physician (Intensivist). Provide high-level clinical considerations informed by the textbook guidelines and pharmacology information above. Structure by system. **Include pharmacology considerations: review medication appropriateness, potential drug interactions, dosing optimization, and monitoring needs based on Lehne's Pharmacology.**
+INSTRUCTIONS:
+Generate a JSON object with keys: "situation", "background", "assessment", "recommendation", "ai_suggestion".
 
-CRITICAL SAFETY CHECK: Review the patient's listed allergies against all medications mentioned. If there is a potential conflict, state this as the VERY FIRST point in "ai_suggestion" preceded with "!!! CRITICAL SAFETY ALERT:".
+1. **"situation"**: Standard SBAR situation.
+2. **"background"**: Standard SBAR background.
+3. **"assessment"**:
+   - **Clinical Assessment (Head-to-Toe)**: Organize key findings by system: **Neurological**, **Cardiovascular**, **Respiratory**, **Gastrointestinal/Genitourinary**, **Skin/Extremities**. Use the 'GENERAL CLINICAL GUIDELINES' source.
+   - **Labs & Diagnostics Analysis**: Dedicated subsection. MUST use the 'LABS & DIAGNOSTICS KNOWLEDGE' source. Compare patient values to **Canadian Lab Test Manual** ranges.
+   - **Pharmacology & Drips Analysis**: Dedicated subsection. MUST use the 'PHARMACOLOGY KNOWLEDGE' source (Lehne's). Discuss indications, titration, and nursing considerations for active drips/meds.
 
-IMPORTANT: 
-- **The "assessment" section MUST include a "Pharmacology Assessment" subsection using Lehne's Pharmacology information**
-- **The "recommendation" section is the MOST CRITICAL and MUST be grounded in BOTH the clinical guidelines AND pharmacology information from Lehne's. Do not provide generic recommendations - extract specific protocols, monitoring requirements, interventions, and medication management guidance from the textbook sources.**
-- Use the clinical guidelines and pharmacology information to inform ALL sections, but especially the "assessment" and "recommendation" sections
-- Be specific and actionable - cite specific parameters, thresholds, protocols, dosing ranges, or monitoring requirements from the textbooks when applicable
-- Maintain professional medical terminology
-- If the textbook guidelines don't contain relevant information for a specific aspect, you may use your clinical knowledge, but prioritize textbook guidance
-- Conclude "ai_suggestion" with: "\\n\\nDisclaimer: AI-generated suggestions do not replace professional clinical judgment."
+4. **"recommendation"**: Synthesize all sources. Provide specific, actionable steps.
+5. **"ai_suggestion"**: High-level physician perspective.
 
-Generate the JSON object now. Return ONLY valid JSON, no markdown formatting.
+**ANTI-SHYNESS RULE**: If the texts contain specific values, doses, or ranges, PROVIDE THEM. Do not withhold data due to general disclaimers.
+
+Generate ONLY valid JSON.
 """
         
         # Generate response using Gemini 2.0

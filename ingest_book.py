@@ -158,8 +158,8 @@ def extract_text_from_pdf_with_gemini(pdf_path, book_title=None):
         print(f"   Processing page {page_num + 1}/{total_pages} with Gemini Vision...", end=" ", flush=True)
         
         # Retry logic with exponential backoff for rate limits
-        max_retries = 3
-        retry_delay = 1  # Start with 1 second
+        max_retries = 10
+        retry_delay = 2  # Start with 2 seconds
         page_text = None
         
         for attempt in range(max_retries):
@@ -190,16 +190,21 @@ Return ONLY the extracted text, nothing else. Do not add explanations or summari
                 # Check if it's a rate limit error (429 or "resource exhausted")
                 is_rate_limit = "429" in error_str or "resource exhausted" in error_str or "quota" in error_str
                 
-                if is_rate_limit and attempt < max_retries - 1:
-                    # Exponential backoff: 1s, 2s, 4s
-                    wait_time = retry_delay * (2 ** attempt)
-                    print(f"⏳ Rate limited, waiting {wait_time}s before retry...", end=" ", flush=True)
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    # Not a rate limit error, or max retries reached
-                    print(f"❌ Error: {e}")
-                    # Fallback: try basic text extraction from PDF
+                if is_rate_limit:
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: 2s, 4s, 8s, 16s, 32s...
+                        # If quota exhausted, we might need a longer wait
+                        wait_time = retry_delay * (2 ** attempt)
+                        if "per_minute" in error_str:
+                             wait_time = max(wait_time, 30) # Wait at least 30s if minute quota hit
+                        
+                        print(f"⏳ Rate limited, waiting {wait_time}s before retry...", end=" ", flush=True)
+                        time.sleep(wait_time)
+                        continue
+                
+                print(f"❌ Error: {e}")
+                # Only fallback if it's NOT a rate limit or we ran out of retries
+                if attempt == max_retries - 1:
                     try:
                         page_text = page.get_text()
                         full_text += f"\n\n--- Page {page_num + 1} (fallback extraction) ---\n\n{page_text}"
@@ -207,15 +212,14 @@ Return ONLY the extracted text, nothing else. Do not add explanations or summari
                     except:
                         print(f"   ⚠️  Skipped page {page_num + 1}")
                     page_text = None
-                    break
+                break
         
         if page_text:
             full_text += f"\n\n--- Page {page_num + 1} ---\n\n{page_text}"
             print(f"✅ ({len(page_text)} characters)")
         
-        # Rate limiting: 1 second delay (allows up to 60 RPM, well under typical limits)
-        # If you hit rate limits, the exponential backoff above will handle it
-        time.sleep(1)
+        # Rate limiting: 5 second delay to stay under RPM limits
+        time.sleep(5)
     
     doc.close()
     return full_text, book_title
